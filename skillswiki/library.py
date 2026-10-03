@@ -8,7 +8,7 @@ import hashlib
 import shutil
 from pathlib import Path
 
-from skillswiki import paths, store
+from skillswiki import discovery, paths, store
 
 FINGERPRINT_CHARS = 16
 _SKIP_NAMES = frozenset({"__pycache__", ".DS_Store"})
@@ -57,7 +57,8 @@ def adopt(slug: str) -> dict:
         conn.execute("UPDATE skills SET status = 'adopted', path = ?, origin_path = ?, fingerprint = ?, "
                      "adopted_at = ?, updated_at = ? WHERE slug = ?",
                      (str(target), str(source), fingerprint(target), store.now(), store.now(), slug))
-    return {"slug": slug, "from": str(source), "to": str(target)}
+    others = [c["path"] for c in discovery.scan()["conflicts"] if c["slug"] == slug]
+    return {"slug": slug, "from": str(source), "to": str(target), "other_copies": others}
 
 
 def release(slug: str) -> dict:

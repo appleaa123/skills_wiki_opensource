@@ -45,6 +45,8 @@ def test_slug_collision_reported_not_overwritten(tmp_home):
 def test_plugin_skills_listed_read_only(tmp_home):
     install = tmp_home / "userhome" / ".claude" / "plugins" / "cache" / "mkt" / "toolkit" / "abc"
     install_fixture_skills(install / "skills", ["meeting-notes"])
+    install_fixture_skills(install / "docs" / "zh-TW" / "skills", ["meeting-notes"])  # translated copy: ignored
+    install_fixture_skills(install / "skills" / "meeting-notes" / "upstream", ["csv-cleaner"])  # nested: ignored
     manifest = tmp_home / "userhome" / ".claude" / "plugins" / "installed_plugins.json"
     manifest.write_text(json.dumps({"version": 2, "plugins": {"toolkit@mkt": [{"installPath": str(install)}]}}))
     skills = discovery.scan()["skills"]

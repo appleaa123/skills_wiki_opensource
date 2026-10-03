@@ -15,6 +15,7 @@ SCRIPT_SUFFIXES = frozenset({".py", ".sh", ".js", ".ts", ".rb", ".pl", ".ps1", "
 MAX_FILES_INSPECTED = 2000
 CHARS_PER_TOKEN = 4
 PLUGIN_MANIFEST = Path(".claude") / "plugins" / "installed_plugins.json"
+PLUGIN_SKILLS_DIR = "skills"  # plugin convention: <installPath>/skills/<name>/SKILL.md (one level, like native roots)
 
 
 def _skill_dirs(root: Path) -> list[Path]:
@@ -54,8 +55,8 @@ def _plugin_skills() -> list[tuple[str, Path]]:
             plugin = key.split("@", 1)[0]
             for install in installs or []:
                 base = Path(install.get("installPath") or "")
-                for skill_md in sorted(base.rglob(frontmatter.SKILL_FILE)) if base.is_dir() else []:
-                    found.append((f"{plugin}:{skill_md.parent.name}", skill_md.parent))
+                for folder in _skill_dirs(base / PLUGIN_SKILLS_DIR):
+                    found.append((f"{plugin}:{folder.name}", folder))
         return found
     except (OSError, ValueError, AttributeError, TypeError):
         return []

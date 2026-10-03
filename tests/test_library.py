@@ -39,7 +39,8 @@ def test_fingerprint_changes_when_file_added(native):
 def test_adopt_moves_folder_and_updates_row(native):
     result = library.adopt("email-polisher")
     target = paths.library_dir() / "email-polisher"
-    assert result == {"slug": "email-polisher", "from": str(native / "email-polisher"), "to": str(target)}
+    assert result == {"slug": "email-polisher", "from": str(native / "email-polisher"), "to": str(target),
+                      "other_copies": []}
     assert not (native / "email-polisher").exists() and (target / "SKILL.md").is_file()
     row = _row("email-polisher")
     assert row["status"] == "adopted" and row["path"] == str(target)
@@ -117,3 +118,11 @@ def test_symlinked_skill_round_trip(tmp_home):
     assert target.is_symlink() and not link.exists() and real.is_dir()
     library.release("meeting-notes")
     assert link.is_symlink() and os.readlink(link) == str(real)
+
+
+def test_adopt_reports_other_native_copies(tmp_home):
+    install_fixture_skills(tmp_home / "userhome" / ".claude" / "skills", ["email-polisher"])
+    install_fixture_skills(tmp_home / "userhome" / ".agents" / "skills", ["email-polisher"])
+    discovery.sync_db()
+    result = library.adopt("email-polisher")
+    assert result["other_copies"] == [str(tmp_home / "userhome" / ".agents" / "skills" / "email-polisher")]
