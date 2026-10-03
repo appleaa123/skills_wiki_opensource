@@ -162,5 +162,6 @@ def report(slug: str) -> list[dict]:
                     "accepted": bool(r["accepted"]), "created_at": r["created_at"],
                     "ci": (res.get("stats") or {}).get("delta_pp_ci95"),
                     "pairwise": {k: pair.get(k) for k in ("wins", "losses", "ties")} if pair else None,
+                    "cascade": res.get("cascade"),
                     "result_path": r["result_path"]})
     return out

@@ -43,6 +43,17 @@ def _confirm(args, message: str) -> None:
             raise ValueError("cancelled")
 
 
+def _unique_result_path(slug: str):
+    """<results>/<slug>/<UTC ts>.json; a run finishing in the same second as an earlier one gets a -N suffix
+    instead of overwriting it."""
+    folder = paths.results_dir() / slug
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    out, n = folder / f"{ts}.json", 1
+    while out.exists():
+        out, n = folder / f"{ts}-{n}.json", n + 1
+    return out
+
+
 def cmd_run(args) -> None:
     from skillswiki.evals import runner
 
@@ -70,15 +81,47 @@ def cmd_run(args) -> None:
             learnings_block=block, learnings_meta=meta, cascade=args.cascade)
     except (runner.BudgetExceeded, runner.NoIndependentJudgeAvailable, FileNotFoundError) as exc:
         raise ValueError(str(exc)) from exc
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = paths.results_dir() / args.slug / f"{ts}.json"
+    out = _unique_result_path(args.slug)
     runner._write_result(result, out)
     eval_id = ratchet_local.record(out, args.tier)
+    calibration_line = ingest_calibration(args.slug, out) if args.cascade else None
     if args.json:
-        print(json.dumps({"eval_id": eval_id, "result_path": str(out)}))
+        print(json.dumps({"eval_id": eval_id, "result_path": str(out), "calibration": calibration_line}))
         return
     runner.print_summary(result)
+    if calibration_line:
+        print(calibration_line)
     print(f"\nRecorded as eval #{eval_id}. Accept it as the baseline with: skillswiki eval accept {eval_id}")
+
+
+def ingest_calibration(slug: str, result_path) -> str:
+    """Feed a cascade run's paired JEV/LLM grades into the user's calibration store; return a one-line summary."""
+    from skillswiki.evals import calibration
+
+    judge, rows = calibration.paired_rows(result_path)
+    store = calibration.load(slug)
+    try:
+        store = calibration.update(store, result_path.name, judge, rows, calibration._pack_props(slug),
+                                   calibration.cascade_config())
+    except SystemExit:
+        return f"calibration: {result_path.name} already ingested"
+    calibration.save(store)
+    entries = store["judges"].get(judge, {})
+    trusted = sum(1 for e in entries.values() if e.get("status") == "calibrated")
+    return (f"calibration: {len(rows)} paired grades added; {len(entries)} criteria tracked, {trusted} trusted for "
+            f"judge {judge}")
+
+
+def cmd_calibration(args) -> None:
+    from skillswiki.evals import calibration
+
+    store = calibration.load(args.slug)
+    if args.json:
+        print(json.dumps(store["judges"], indent=2))
+    elif not store["judges"]:
+        print(f"No calibration yet for {args.slug}. Run: skillswiki eval run {args.slug} --cascade")
+    else:
+        calibration._show(store)
 
 
 def cmd_report(args) -> None:
@@ -94,6 +137,12 @@ def cmd_report(args) -> None:
         print(f"#{r['id']} {r['created_at'][:16]} tier={r['tier']} verdict={r['verdict']} "
               f"delta={r['delta_pp']} ci={r['ci']} pairwise W/L/T={pw.get('wins')}/{pw.get('losses')}/{pw.get('ties')} "
               f"tokens={r['tokens_total']}{' ACCEPTED' if r['accepted'] else ''}")
+        c = r.get("cascade")
+        if c:
+            jev_final = (c.get("final_by") or {}).get("jev", 0)
+            print(f"    JEV cascade: {jev_final}/{c.get('verdicts')} grades final by JEV, "
+                  f"{c.get('jev_input_tokens'):,} JEV tokens (${c.get('jev_cost_usd')}), "
+                  f"{c.get('llm_judge_calls')} LLM judge calls")
 
 
 def cmd_accept(args) -> None:
@@ -181,6 +230,10 @@ def register(sub) -> None:
     p = esub.add_parser("show", help="print a suite's tasks and rubric")
     p.add_argument("slug")
     p.set_defaults(func=cmd_show)
+
+    p = esub.add_parser("calibration", help="show where JEV has earned trust against your judge")
+    p.add_argument("slug")
+    p.set_defaults(func=cmd_calibration)
 
     p = esub.add_parser("report", help="list a skill's eval runs, newest first")
     p.add_argument("slug")
