@@ -34,8 +34,7 @@ import sys
 
 from . import Backend, BackendUnavailable
 
-# Patterns observed in an exhausted-quota response body (evals/results/
-# humanizer/20260909T145531Z.outputs.jsonl) — checked in addition to
+# Patterns observed in a real exhausted-quota response body — checked in addition to
 # `is_error`/`subtype` in case a future CLI version reports quota exhaustion
 # as a "successful" call with an apologetic message in `result`.
 _QUOTA_PATTERNS = ("session limit", "usage limit", "rate limit", "quota exceeded")

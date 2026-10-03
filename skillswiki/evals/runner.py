@@ -22,7 +22,7 @@ P1.4c (2026-09-09) — cost redesign:
     an empty response, or a detected quota/rate-limit message) instead of
     silently returning the failure text as if it were model output — a real
     bug that fabricated a +26.7pp/+74pp scorecard from an exhausted
-    subscription quota (evals/results/humanizer/20260909T145531Z.outputs.jsonl).
+    subscription quota.
   - `--tier screen|publish` applies a lean, pinned invocation profile
     (evals/config.json's "invocation_profile") that strips Claude Code's
     ~43,000-token default boot context (agent system prompt, every built-in
@@ -346,7 +346,7 @@ def _judge(
 def _judge_structured(
     backend, prompt: str, response: str, rubric: dict, votes: int = 1,
 ) -> tuple[dict[str, int], dict | None, dict | None]:
-    """Structured-judge path (JEV Phase 1, development_guide/jev/): the
+    """Structured-judge path (JEV): the
     backend answers per criterion with calibrated confidence instead of
     returning text, so there is no prompt to render or parse. Returns
     (scale, usage, detail); detail carries each criterion's confidence and

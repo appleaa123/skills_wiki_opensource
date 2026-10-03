@@ -43,7 +43,7 @@ been validated against human graders). `items` are pack-specific, 3–6 per pack
 3. Only the final deliverable is graded (`evals/deliverable.py`). Working notes are stripped; `paste_ready` is reported, not scored.
 4. Phrase every criterion affirmatively (what a good output does), not as a negation — negation-heavy rubric text biases LLM judges toward fail (arXiv 2609.02942).
 5. `applied` (optional): the skill's own rules, judged per output on the same 0/1/2 scale, reported as `applied_rate`; excluded from pass/`rubric_score`.
-6. Criterion properties (optional; JEV cascade, `development_guide/jev/phase_2_cascade_judge.md`). LLM judges never see them:
+6. Criterion properties (optional; used by the JEV cascade). LLM judges never see them:
    - `kind`: `factual` (fidelity to inputs) | `constraint` ("no X" rule) | `count` (length/number rule) | `style` | `legal`.
      Untagged = treated as `factual` (the cautious default: JEV may only fail it). Tag `style` to let JEV pass it too.
    - `risk`: `low` (default) | `high` (legal, safety, money: always graded by the LLM judge).

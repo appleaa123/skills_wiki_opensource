@@ -1,8 +1,7 @@
 """P1.4d Phase 1, task 1.1: deliverable extraction and paste-ready detection.
-Fixtures below are literal strings copied from real stored outputs (see
-evals/results/*/*.outputs.jsonl, which are gitignored and local-only) so the
-tests carry the corpus audit's load-bearing cases without depending on files
-that only exist on the founder's machine."""
+Fixtures below are literal strings copied from real stored outputs, so the
+tests carry the corpus audit's load-bearing cases without depending on local
+result files."""
 import sys
 from pathlib import Path
 

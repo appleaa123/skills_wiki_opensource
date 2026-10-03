@@ -8,7 +8,7 @@ failed call (non-zero exit, an error envelope, empty output, or a detected
 quota/rate-limit message) must never be silently scored as if it were model
 output. Before this change, a failed `claude -p` call quietly returned "" or
 the CLI's own error string, which the judge then scored like any other
-response (evals/results/humanizer/20260909T145531Z.outputs.jsonl: 30/30
+response (in one real run, 30/30
 `no_skill` records and 2/30 `skill` records were the literal string "You've
 hit your session limit...", scored and published as a real result). `usage`
 is populated only for backends whose CLI exposes a structured token count
