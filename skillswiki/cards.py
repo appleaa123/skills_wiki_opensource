@@ -4,17 +4,16 @@ Stored only in Skills Wiki's database, never in the user's skill files. Written 
 user's own AI CLI on request (`enrich`, which spends the user's tokens). Nothing generates a card automatically.
 """
 import json
-import re
 
 from skillswiki import frontmatter, store
 from skillswiki.evals.backends import get_backend
+from skillswiki.textjson import extract_object
 
 FIELDS = ("examples", "keywords", "not_for")
 MAX_ITEMS = 15
 MAX_ITEM_CHARS = 200
 SKILL_TEXT_MAX_CHARS = 12000
 ENRICH_TIMEOUT_S = 180
-_FENCED = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 
 ENRICH_PROMPT = """You are writing a routing card for an AI skill. Read the skill below and return ONLY a JSON object:
 {{"examples": [5-10 requests a real user would type when this skill is the right one, varied wording, no skill
@@ -77,18 +76,6 @@ def delete(slug: str) -> None:
         conn.execute("DELETE FROM cards WHERE slug = ?", (slug,))
 
 
-def _parse(text: str) -> dict | None:
-    candidates = [m.group(1) for m in _FENCED.finditer(text)] + [text[text.find("{"): text.rfind("}") + 1]]
-    for candidate in candidates:
-        try:
-            data = json.loads(candidate)
-        except ValueError:
-            continue
-        if isinstance(data, dict):
-            return data
-    return None
-
-
 def enrich(slug: str, backend: str = "claude") -> dict:
     """Ask the user's AI CLI to draft a card from SKILL.md (user's tokens). Raises BackendUnavailable if the
     CLI fails, ValueError if it twice returns something that is not a valid card."""
@@ -101,7 +88,7 @@ def enrich(slug: str, backend: str = "claude") -> dict:
     reply = ""
     for attempt_prompt in (prompt, prompt + RETRY_SUFFIX):
         reply = cli.judge(attempt_prompt, None, timeout=ENRICH_TIMEOUT_S)["text"]
-        data = _parse(reply)
+        data = extract_object(reply)
         if data is not None:
             try:
                 return _save(slug, data, "enrich")

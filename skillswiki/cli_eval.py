@@ -108,6 +108,42 @@ def cmd_accept(args) -> None:
     print(line)
 
 
+def cmd_generate(args) -> None:
+    from skillswiki.evals import generator
+
+    print(f"Asking {args.backend} to draft an eval suite for {args.slug} (uses your own AI tokens)...", file=sys.stderr)
+    result = generator.generate(args.slug, args.backend, overwrite=args.overwrite)
+    if args.json:
+        print(json.dumps(result))
+        return
+    print(f"Drafted {result['tasks']} tasks at {result['path']} ({result['tokens']:,} tokens).\n"
+          f"Review and edit the suite files before running: skillswiki eval show {args.slug}, then "
+          f"skillswiki eval check {args.slug}")
+
+
+def cmd_check(args) -> None:
+    from skillswiki.evals import suite_check
+
+    result = suite_check.check(args.slug, llm=args.llm, backend=args.backend)
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        for issue in result["issues"]:
+            print(f"{issue['level'].upper():5} {issue['where']}: {issue['message']}")
+        print(f"{'OK — suite marked checked.' if result['ok'] else 'Blocking problems — fix them and re-run.'}")
+    if not result["ok"]:
+        raise ValueError("suite has blocking problems")
+
+
+def cmd_show(args) -> None:
+    from skillswiki.evals import suite_check
+
+    try:
+        print(suite_check.show(args.slug))
+    except FileNotFoundError as exc:
+        raise ValueError(str(exc)) from exc
+
+
 def register(sub) -> None:
     parser = sub.add_parser("eval", help="evaluate and benchmark a skill (uses your own AI tokens)")
     esub = parser.add_subparsers(dest="eval_command", required=True)
@@ -125,6 +161,22 @@ def register(sub) -> None:
     p.add_argument("--cascade", action="store_true", help="JEV grading cascade (needs your TYPESAFE_API_KEY)")
     p.add_argument("--yes", action="store_true", help="skip the confirmation for larger tiers")
     p.set_defaults(func=cmd_run)
+
+    p = esub.add_parser("generate", help="draft an eval suite from the skill's SKILL.md (uses your tokens)")
+    p.add_argument("slug")
+    p.add_argument("--backend", choices=BACKENDS, default="claude")
+    p.add_argument("--overwrite", action="store_true")
+    p.set_defaults(func=cmd_generate)
+
+    p = esub.add_parser("check", help="check a suite before running it")
+    p.add_argument("slug")
+    p.add_argument("--llm", action="store_true", help="also ask your AI CLI to flag restating prompts (uses tokens)")
+    p.add_argument("--backend", choices=BACKENDS, default="claude")
+    p.set_defaults(func=cmd_check)
+
+    p = esub.add_parser("show", help="print a suite's tasks and rubric")
+    p.add_argument("slug")
+    p.set_defaults(func=cmd_show)
 
     p = esub.add_parser("report", help="list a skill's eval runs, newest first")
     p.add_argument("slug")
