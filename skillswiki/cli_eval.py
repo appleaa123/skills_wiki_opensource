@@ -130,6 +130,10 @@ def cmd_check(args) -> None:
     else:
         for issue in result["issues"]:
             print(f"{issue['level'].upper():5} {issue['where']}: {issue['message']}")
+        jev = result.get("jev")
+        if jev:
+            print(f"JEV: {jev['input_tokens']:,} tokens, ${jev['usd']:.6f}" if "usd" in jev
+                  else f"JEV unavailable ({jev['unavailable']}); other checks ran.")
         print(f"{'OK — suite marked checked.' if result['ok'] else 'Blocking problems — fix them and re-run.'}")
     if not result["ok"]:
         raise ValueError("suite has blocking problems")
