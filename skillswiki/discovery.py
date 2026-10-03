@@ -21,7 +21,8 @@ PLUGIN_SKILLS_DIR = "skills"  # plugin convention: <installPath>/skills/<name>/S
 def _skill_dirs(root: Path) -> list[Path]:
     if not root.is_dir():
         return []
-    return [c for c in sorted(root.iterdir()) if c.is_dir() and (c / frontmatter.SKILL_FILE).is_file()]
+    return [c for c in sorted(root.iterdir())
+            if c.is_dir() and not c.name.startswith(".") and (c / frontmatter.SKILL_FILE).is_file()]
 
 
 def has_scripts(folder: Path) -> bool:
@@ -104,8 +105,8 @@ def sync_db() -> dict:
                 (slug, s["name"], s["description"], s["status"], s["path"], int(s["has_scripts"]),
                  s["context_tokens_est"], ts))
             if s["status"] != "adopted":
-                conn.execute("UPDATE skills SET origin_path = NULL, fingerprint = NULL, adopted_at = NULL "
-                             "WHERE slug = ?", (slug,))
+                conn.execute("UPDATE skills SET origin_path = NULL, fingerprint = NULL, adopted_at = NULL, "
+                             "copies = NULL WHERE slug = ?", (slug,))
         for slug, row in existing.items():
             if slug in found:
                 continue

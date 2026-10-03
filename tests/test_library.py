@@ -40,7 +40,7 @@ def test_adopt_moves_folder_and_updates_row(native):
     result = library.adopt("email-polisher")
     target = paths.library_dir() / "email-polisher"
     assert result == {"slug": "email-polisher", "from": str(native / "email-polisher"), "to": str(target),
-                      "other_copies": []}
+                      "moved_copies": [], "other_copies": [], "differing_copies": []}
     assert not (native / "email-polisher").exists() and (target / "SKILL.md").is_file()
     row = _row("email-polisher")
     assert row["status"] == "adopted" and row["path"] == str(target)
@@ -120,12 +120,14 @@ def test_symlinked_skill_round_trip(tmp_home):
     assert link.is_symlink() and os.readlink(link) == str(real)
 
 
-def test_adopt_reports_other_native_copies(tmp_home):
+def test_adopt_moves_identical_other_copy(tmp_home):
+    # Behaviour changed 2026-10-03 (owner): identical copies are moved with the skill instead of only reported.
     install_fixture_skills(tmp_home / "userhome" / ".claude" / "skills", ["email-polisher"])
     install_fixture_skills(tmp_home / "userhome" / ".agents" / "skills", ["email-polisher"])
     discovery.sync_db()
     result = library.adopt("email-polisher")
-    assert result["other_copies"] == [str(tmp_home / "userhome" / ".agents" / "skills" / "email-polisher")]
+    assert result["moved_copies"] == [str(tmp_home / "userhome" / ".agents" / "skills" / "email-polisher")]
+    assert result["other_copies"] == []
 
 
 def test_adopt_rolls_back_when_db_update_fails(native, monkeypatch):
@@ -154,3 +156,66 @@ def test_adopt_survives_unreadable_skill_elsewhere(native, tmp_home):
         assert result["other_copies"] == []
     finally:
         (bad / "SKILL.md").chmod(0o644)
+
+
+# ── adopt every identical copy (owner decision 2026-10-03) ─────────────
+
+
+def _copies(tmp_home, *dirs):
+    roots = [tmp_home / "userhome" / d / "skills" for d in dirs]
+    for root in roots:
+        install_fixture_skills(root, ["email-polisher"])
+    discovery.sync_db()
+    return [root / "email-polisher" for root in roots]
+
+
+def test_identical_copies_are_all_moved_and_all_restored(tmp_home):
+    claude, agents, gemini = _copies(tmp_home, ".claude", ".agents", ".gemini")
+    before = library.fingerprint(claude)
+    result = library.adopt("email-polisher")
+    assert result["moved_copies"] == [str(agents), str(gemini)] and result["other_copies"] == []
+    assert not claude.exists() and not agents.exists() and not gemini.exists()
+    assert {s["slug"] for s in discovery.scan()["skills"]} == {"email-polisher"}  # no native copy left to trigger
+    assert discovery.scan()["conflicts"] == []
+    discovery.sync_db()  # a rescan keeps the recorded copies
+    result = library.release("email-polisher")
+    assert result["restored_copies"] == [str(agents), str(gemini)]
+    for folder in (claude, agents, gemini):
+        assert library.fingerprint(folder) == before
+    assert _row("email-polisher")["copies"] is None
+
+
+def test_differing_copy_stays_and_is_reported(tmp_home):
+    claude, agents = _copies(tmp_home, ".claude", ".agents")
+    (agents / "SKILL.md").write_text((agents / "SKILL.md").read_text() + "\nlocal tweak\n")
+    result = library.adopt("email-polisher")
+    assert result["moved_copies"] == [] and result["other_copies"] == [str(agents)]
+    assert result["differing_copies"] == [str(agents)]
+    assert agents.exists() and not claude.exists()
+
+
+def test_release_refuses_if_any_copy_origin_is_occupied(tmp_home):
+    claude, agents = _copies(tmp_home, ".claude", ".agents")
+    library.adopt("email-polisher")
+    agents.mkdir()
+    with pytest.raises(ValueError, match="already exists"):
+        library.release("email-polisher")
+    assert (paths.library_dir() / "email-polisher").exists() and not claude.exists()
+
+
+def test_adopt_rolls_back_copies_when_store_update_fails(tmp_home, monkeypatch):
+    claude, agents = _copies(tmp_home, ".claude", ".agents")
+    calls = {"n": 0}
+    real = store.connect
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("disk full")
+        return real()
+    monkeypatch.setattr(library.store, "connect", flaky)
+    with pytest.raises(RuntimeError, match="disk full"):
+        library.adopt("email-polisher")
+    monkeypatch.setattr(library.store, "connect", real)
+    assert claude.exists() and agents.exists()
+    assert not (paths.library_dir() / "email-polisher").exists()

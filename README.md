@@ -31,8 +31,9 @@ Full walkthrough, including the Claude Code hook and other agents: [docs/quickst
 skills those descriptions crowd the context and compete with each other. `skillswiki adopt <slug>` moves the skill
 folder from your agent's skills directory into `~/.skillswiki/library/`. Your agent stops triggering it on its own,
 and Skills Wiki routes it instead. `skillswiki release <slug>` moves it back, byte for byte. Plugin-managed skills
-are listed but never moved. If the same skill is installed for several agents, `adopt` tells you which other
-copies are still active.
+are listed but never moved. If the same skill is installed for several agents, identical copies move with it (and
+come back on release), so no agent keeps triggering it on its own; a copy that differs stays put and `adopt` warns
+you about it.
 
 **Without a key: keyword routing.** Each request is matched (BM25) against the skill's own `description`, the
 trigger text its author wrote. Skills Wiki returns a shortlist and your agent decides. It never forces a skill.

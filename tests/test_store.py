@@ -44,3 +44,17 @@ def test_status_check_constraint(tmp_home):
         with store.connect() as conn:
             conn.execute("INSERT INTO skills (slug, name, status, path, updated_at) VALUES ('a','a','bogus','/x',?)",
                          (store.now(),))
+
+
+def test_old_database_gains_copies_column(tmp_home):
+    import sqlite3
+
+    from skillswiki import paths
+    old = sqlite3.connect(paths.db_path())
+    old.execute("CREATE TABLE skills (slug TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',"
+                " status TEXT NOT NULL, path TEXT NOT NULL, origin_path TEXT, fingerprint TEXT, has_scripts INTEGER "
+                "NOT NULL DEFAULT 0, context_tokens_est INTEGER NOT NULL DEFAULT 0, adopted_at TEXT, updated_at TEXT NOT NULL)")
+    old.commit()
+    old.close()
+    with store.connect() as conn:
+        assert "copies" in {r["name"] for r in conn.execute("PRAGMA table_info(skills)")}

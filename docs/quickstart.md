@@ -29,8 +29,8 @@ skillswiki adopt <slug>         # moves the skill into ~/.skillswiki/library —
 skillswiki release <slug>       # moves it back, byte-for-byte
 ```
 
-Plugin-managed skills are listed but never moved. If the same skill is installed for several agents, `adopt` tells
-you which other copies are still active.
+Plugin-managed skills are listed but never moved. If the same skill is installed for several agents, identical
+copies move with it and come back on release; a copy that differs stays where it is and `adopt` warns you.
 
 ## 3. Connect your agent
 

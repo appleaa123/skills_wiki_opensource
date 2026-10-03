@@ -51,8 +51,11 @@ def cmd_list(args) -> None:
 def cmd_adopt(args) -> None:
     result = library.adopt(args.slug)
     human = f"Adopted {result['slug']}: {result['from']} -> {result['to']}"
-    for other in result["other_copies"]:
-        human += f"\n  note: another copy is still active natively at {other} (adopt does not move it)"
+    for other in result["moved_copies"]:
+        human += f"\n  also moved an identical copy from {other} (release puts it back)"
+    for other in result["differing_copies"]:
+        human += (f"\n  warning: a different version is still active natively at {other}; your agent may still "
+                  "trigger it on its own. Remove it, or make it identical and adopt again.")
     _print(result, args.json, human)
 
 

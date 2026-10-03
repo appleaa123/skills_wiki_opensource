@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS skills (
   fingerprint TEXT,
   has_scripts INTEGER NOT NULL DEFAULT 0,
   context_tokens_est INTEGER NOT NULL DEFAULT 0,
-  adopted_at TEXT, updated_at TEXT NOT NULL);
+  adopted_at TEXT, updated_at TEXT NOT NULL,
+  copies TEXT);                  -- JSON [{"origin", "stored"}]: identical copies moved along with the skill
 CREATE TABLE IF NOT EXISTS cards (
   slug TEXT PRIMARY KEY, examples TEXT NOT NULL DEFAULT '[]', keywords TEXT NOT NULL DEFAULT '[]',
   not_for TEXT NOT NULL DEFAULT '[]', source TEXT NOT NULL CHECK (source IN ('enrich','manual')),
@@ -46,6 +47,13 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add columns introduced after a database was created."""
+    columns = {r["name"] for r in conn.execute("PRAGMA table_info(skills)")}
+    if "copies" not in columns:
+        conn.execute("ALTER TABLE skills ADD COLUMN copies TEXT")
+
+
 @contextmanager
 def connect() -> Iterator[sqlite3.Connection]:
     """Open the database, ensure the schema, commit on success, roll back on error, always close."""
@@ -54,6 +62,7 @@ def connect() -> Iterator[sqlite3.Connection]:
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(SCHEMA)
+        _migrate(conn)
         yield conn
         conn.commit()
     except Exception:
