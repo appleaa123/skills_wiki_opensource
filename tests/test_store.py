@@ -1,0 +1,46 @@
+from skillswiki import store
+
+TABLES = {"skills", "cards", "learnings", "routing_log", "usage", "evals", "settings"}
+
+
+def _tables(conn) -> set[str]:
+    return {r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+
+
+def test_schema_created(tmp_home):
+    with store.connect() as conn:
+        assert TABLES <= _tables(conn)
+
+
+def test_connect_is_idempotent(tmp_home):
+    with store.connect() as conn:
+        conn.execute("INSERT INTO settings (key, value) VALUES ('learning', 'on')")
+    with store.connect() as conn:
+        assert TABLES <= _tables(conn)
+        assert conn.execute("SELECT value FROM settings WHERE key='learning'").fetchone()["value"] == "on"
+
+
+def test_wal_mode(tmp_home):
+    with store.connect() as conn:
+        assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+
+
+def test_now_is_utc_iso():
+    ts = store.now()
+    assert ts.endswith("+00:00") and "T" in ts
+
+
+def test_settings_helpers(tmp_home):
+    assert store.get_setting("learning", "on") == "on"
+    store.set_setting("learning", "off")
+    assert store.get_setting("learning", "on") == "off"
+
+
+def test_status_check_constraint(tmp_home):
+    import sqlite3
+
+    import pytest
+    with pytest.raises(sqlite3.IntegrityError):
+        with store.connect() as conn:
+            conn.execute("INSERT INTO skills (slug, name, status, path, updated_at) VALUES ('a','a','bogus','/x',?)",
+                         (store.now(),))
