@@ -128,6 +128,24 @@ def cmd_serve_mcp(args) -> None:
     run()
 
 
+def cmd_ui(args) -> None:
+    import webbrowser
+
+    from skillswiki.web.server import make_server
+
+    server = make_server(args.port)
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    print(f"Skills Wiki page: {url} (Ctrl-C to stop)")
+    if not args.no_open:
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+
+
 def cmd_hook(args) -> None:
     from skillswiki import hook
     hook.main()
@@ -180,6 +198,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     from skillswiki import cli_eval
     cli_eval.register(sub)
+
+    p = sub.add_parser("ui", help="open the local management page")
+    p.add_argument("--port", type=int, default=7878)
+    p.add_argument("--no-open", action="store_true", help="don't open a browser")
+    p.set_defaults(func=cmd_ui)
 
     sub.add_parser("serve-mcp", help="run the MCP server over stdio").set_defaults(func=cmd_serve_mcp)
     sub.add_parser("hook", help="Claude Code UserPromptSubmit hook (reads stdin)").set_defaults(func=cmd_hook)
