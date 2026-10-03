@@ -6,6 +6,7 @@ recorded origins. Identical copies of the skill in other agents' folders move wi
 """
 import hashlib
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -60,6 +61,15 @@ def _move_back(moves: list[tuple[Path, Path]]) -> None:
         shutil.move(str(stored), str(origin))
 
 
+def _remove_empty_holding_dir(slug: str) -> None:
+    """Remove library/.copies/<slug> (and .copies) only if empty: never deletes anything a user put there."""
+    for folder in (_copies_dir(slug), _copies_dir(slug).parent):
+        try:
+            os.rmdir(folder)
+        except OSError:
+            return
+
+
 def adopt(slug: str) -> dict:
     """Move the skill into the library. Other copies of the same skill in other agents' folders are moved too
     when they are byte-identical (so no agent keeps triggering it natively); a differing copy is left in place and
@@ -76,8 +86,15 @@ def adopt(slug: str) -> dict:
     if _exists(target):
         raise ValueError(f"{target} already exists; move or remove it first")
     digest = fingerprint(source)  # before any move: an unreadable file stops us with nothing moved
-    identical, differing = [], []
-    for other in _other_native_copies(slug, source):
+    identical, differing, linked = [], [], []
+    others = _other_native_copies(slug, source)
+    # A real folder that a symlinked copy (or the skill itself) points at stays put: moving it would leave the link
+    # dangling while adopted. Moving the links themselves is safe.
+    link_targets = {p.resolve() for p in [source, *others] if p.is_symlink()}
+    for other in others:
+        if not other.is_symlink() and other.resolve() in link_targets:
+            linked.append(other)
+            continue
         try:
             (identical if fingerprint(other) == digest else differing).append(other)
         except OSError:
@@ -102,9 +119,11 @@ def adopt(slug: str) -> dict:
                           json.dumps(copies) if copies else None, slug))
     except Exception:
         _move_back(moves)  # keep adopt all-or-nothing
+        _remove_empty_holding_dir(slug)
         raise
     return {"slug": slug, "from": str(source), "to": str(target), "moved_copies": [str(o) for o in identical],
-            "other_copies": [str(o) for o in differing], "differing_copies": [str(o) for o in differing]}
+            "other_copies": [str(o) for o in differing + linked], "differing_copies": [str(o) for o in differing],
+            "linked_copies": [str(o) for o in linked]}
 
 
 def release(slug: str) -> dict:
@@ -113,8 +132,9 @@ def release(slug: str) -> dict:
     if row["status"] != "adopted" or not row["origin_path"]:
         raise ValueError(f"'{slug}' is not adopted")
     copies = json.loads(row["copies"] or "[]")
+    missing = [c["origin"] for c in copies if not _exists(Path(c["stored"]))]
     moves = [(Path(row["origin_path"]), Path(row["path"]))]
-    moves += [(Path(c["origin"]), Path(c["stored"])) for c in copies]
+    moves += [(Path(c["origin"]), Path(c["stored"])) for c in copies if c["origin"] not in missing]
     for origin, _stored in moves:  # check every destination before moving anything
         if _exists(origin):
             raise ValueError(f"{origin} already exists; move or remove it first")
@@ -132,10 +152,10 @@ def release(slug: str) -> dict:
         for origin, stored in reversed(done):
             shutil.move(str(origin), str(stored))
         raise
-    if copies and _exists(_copies_dir(slug)):
-        shutil.rmtree(_copies_dir(slug), ignore_errors=True)  # now-empty holding folder
+    if copies:
+        _remove_empty_holding_dir(slug)
     return {"slug": slug, "from": str(moves[0][1]), "to": str(moves[0][0]),
-            "restored_copies": [c["origin"] for c in copies]}
+            "restored_copies": [str(o) for o, _s in moves[1:]], "missing_copies": missing}
 
 
 def changed(slug: str) -> bool:

@@ -40,7 +40,7 @@ def test_adopt_moves_folder_and_updates_row(native):
     result = library.adopt("email-polisher")
     target = paths.library_dir() / "email-polisher"
     assert result == {"slug": "email-polisher", "from": str(native / "email-polisher"), "to": str(target),
-                      "moved_copies": [], "other_copies": [], "differing_copies": []}
+                      "moved_copies": [], "other_copies": [], "differing_copies": [], "linked_copies": []}
     assert not (native / "email-polisher").exists() and (target / "SKILL.md").is_file()
     row = _row("email-polisher")
     assert row["status"] == "adopted" and row["path"] == str(target)
@@ -219,3 +219,52 @@ def test_adopt_rolls_back_copies_when_store_update_fails(tmp_home, monkeypatch):
     monkeypatch.setattr(library.store, "connect", real)
     assert claude.exists() and agents.exists()
     assert not (paths.library_dir() / "email-polisher").exists()
+
+
+def test_failed_adopt_can_be_retried(tmp_home, monkeypatch):
+    _copies(tmp_home, ".claude", ".agents")
+    calls = {"n": 0}
+    real = store.connect
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("disk full")
+        return real()
+    monkeypatch.setattr(library.store, "connect", flaky)
+    with pytest.raises(RuntimeError):
+        library.adopt("email-polisher")
+    monkeypatch.setattr(library.store, "connect", real)
+    assert not (paths.library_dir() / ".copies" / "email-polisher").exists()
+    assert library.adopt("email-polisher")["moved_copies"]  # retry works
+
+
+def test_symlinked_primary_never_strands_its_target(tmp_home):
+    real = install_fixture_skills(tmp_home / "userhome" / ".agents" / "skills", ["email-polisher"]) / "email-polisher"
+    link_root = tmp_home / "userhome" / ".claude" / "skills"
+    link_root.mkdir(parents=True)
+    os.symlink(real, link_root / "email-polisher")
+    discovery.sync_db()
+    result = library.adopt("email-polisher")
+    assert result["moved_copies"] == [] and result["linked_copies"] == [str(real)]
+    assert (paths.library_dir() / "email-polisher" / "SKILL.md").is_file()  # the link still resolves
+    library.release("email-polisher")
+    assert (link_root / "email-polisher").is_symlink() and real.is_dir()
+
+
+def test_release_never_deletes_user_files_in_holding_folder(tmp_home):
+    _copies(tmp_home, ".claude", ".agents")
+    library.adopt("email-polisher")
+    keep = paths.library_dir() / ".copies" / "email-polisher" / "my-notes.txt"
+    keep.write_text("mine")
+    library.release("email-polisher")
+    assert keep.read_text() == "mine"
+
+
+def test_release_skips_a_missing_stored_copy(tmp_home):
+    import shutil
+    claude, agents = _copies(tmp_home, ".claude", ".agents")
+    library.adopt("email-polisher")
+    shutil.rmtree(paths.library_dir() / ".copies" / "email-polisher" / "1")
+    result = library.release("email-polisher")
+    assert claude.is_dir() and not agents.exists() and result["missing_copies"] == [str(agents)]

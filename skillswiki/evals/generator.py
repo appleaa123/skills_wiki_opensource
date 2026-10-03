@@ -16,10 +16,14 @@ SKILL_TEXT_MAX_CHARS = 20000
 GENERATE_TIMEOUT_S = 600
 MANDATORY_DIMENSIONS = ("failure_mechanism", "actionable_specificity", "high_risk_blacklist")
 VERIFIERS = frozenset({"rubric", "both", "deterministic"})
-# Money/health words on top of the linter's legal/safety vocabulary: a "style" tag on such a criterion is undone.
+# Legal, medical, financial and safety words on top of the linter's vocabulary: a "style" tag on a criterion that
+# mentions any of them is undone. A word list, so it can miss phrasings: review generated kinds before trusting them.
 _EXTRA_RISK_WORDS = re.compile(
     r"\b(payments?|paid|pay|money|invoices?|refunds?|pric(e|es|ing)|billing|tax(es)?|loans?|credit|insurance|"
-    r"salary|wages?|dosage|medication|prescription|allerg\w*)\b", re.IGNORECASE)
+    r"salary|wages?|fees?|interest rates?|debt|mortgages?|invest\w*|lawyers?|attorneys?|contracts?|liabilit\w*|"
+    r"warrant\w*|lawsuits?|court|doctors?|physicians?|nurses?|drugs?|doses?|dosage|medication|prescriptions?|"
+    r"allerg\w*|symptoms?|emergenc\w*|injur\w*|harm\w*|self-harm|suicid\w*|danger\w*|hazard\w*)\b",
+    re.IGNORECASE)
 RETRY_SUFFIX = "\n\nReturn only the JSON object."
 
 

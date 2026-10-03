@@ -118,8 +118,8 @@ on 2026-10-03. Claude did the work, Gemini judged, and the TypeSafe key was on.
   these good answers, so most criteria are still collecting evidence, and on two criteria it disagreed with the
   judge, so those stay with the judge. Since this run, the generator tags every criterion's kind: `style` (tone,
   clarity, structure) only where a lenient grade is harmless, which is where JEV can earn the right to settle grades
-  after enough agreeing runs; a `style` tag on anything that sounds legal, medical, financial or safety-related is
-  set back to `factual` automatically.
+  after enough agreeing runs. As a safety net, a `style` tag on wording that matches a list of legal, medical,
+  financial and safety words is set back to `factual`; it is a word list, so review the kinds before trusting them.
 
 ## JEV, honestly
 

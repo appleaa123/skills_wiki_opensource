@@ -104,3 +104,11 @@ def test_hand_written_suites_may_stay_untagged():
     assert generator.validate("email-polisher", TASKS, RUBRIC) == []
     assert "needs kind" in " ".join(generator.validate("email-polisher", TASKS, {**RUBRIC, "items": [
         {"id": "x", "desc": "y", "kind": "vibes"}]}))
+
+
+@pytest.mark.parametrize("desc", ["Recommends seeing a lawyer before signing the contract.", "Gives the correct dose.",
+                                  "Mentions the late fees.", "Flags any self-harm risk.", "Covers warranty terms.",
+                                  "Tells the user to call a doctor in an emergency.", "States the interest rate."])
+def test_more_risky_wording_is_demoted(desc):
+    rubric = {"items": [{"id": "a", "desc": desc, "kind": "style"}]}
+    assert generator.demote_risky_style(rubric) == ["a"]
