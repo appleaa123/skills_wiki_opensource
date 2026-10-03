@@ -1,0 +1,15 @@
+{
+  "dimensions": [
+    {"id": "failure_mechanism", "desc": "Output avoids the common failure mode this skill's Rules section warns against — TODO: name it specifically."},
+    {"id": "actionable_specificity", "desc": "Output is ready to use as-is, not notes about what it should contain."},
+    {"id": "high_risk_blacklist", "desc": "TODO: name this domain's specific banned claims/phrases/actions."}
+  ],
+  "items": [
+    {"id": "TODO_item_one", "desc": "TODO: a pack-specific deterministic-friendly check.", "weight": 1},
+    {"id": "TODO_item_two", "desc": "TODO: a second pack-specific check.", "weight": 1},
+    {"id": "TODO_item_three", "desc": "TODO: a third pack-specific check, ideally the domain's highest-risk failure.", "weight": 1}
+  ],
+  "applied": [
+    {"id": "TODO_rule_one", "desc": "TODO: one rule from the skill's own text, phrased affirmatively."}
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "rubric_pass_threshold": 0.8,
+  "regression_threshold_pp": 8,
+  "judge_votes": 1,
+  "pairwise": true,
+  "learning": {
+    "pairwise_margin_min": 0.5,
+    "min_decisive": 5,
+    "low_signal_share": 0.5
+  },
+  "cascade": {
+    "ladder": [0.95, 0.9, 0.8, 0.7, 0.6],
+    "fail_only_kinds": ["factual", "constraint"],
+    "untagged_kind": "factual",
+    "baseline_disagreement": 0.209,
+    "exact_baseline": 0.334,
+    "lean_limit": 0.1,
+    "min_per_arm": 8,
+    "p_audit": 0.1,
+    "state_char_limit": 100000,
+    "pairwise": "shadow",
+    "usd_per_million_jev_tokens": 0.042
+  },
+  "invocation_profile": {
+    "id": "lean-v1",
+    "model": "sonnet",
+    "system_prompt": "You are a helpful assistant. Answer the user's request directly. Output only the requested content.",
+    "flags": ["--safe-mode", "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--no-session-persistence"]
+  },
+  "per_call_estimate_tokens": {
+    "skill_exec": 11000,
+    "no_skill_exec": 600,
+    "skill_learning_exec": 13000,
+    "judge": 1500,
+    "pairwise_judge": 1800
+  },
+  "tiers": {
+    "screen": {
+      "arms": ["skill"],
+      "runs": 1,
+      "max_tokens": 250000
+    },
+    "publish": {
+      "arms": ["skill", "no_skill"],
+      "runs": 3,
+      "max_tokens": 1000000
+    },
+    "learning": {
+      "arms": ["skill", "no_skill", "skill_learning"],
+      "runs": 3,
+      "max_tokens": 1500000
+    },
+    "learning_screen": {
+      "arms": ["skill", "skill_learning"],
+      "runs": 1,
+      "max_tokens": 400000
+    }
+  }
+}
