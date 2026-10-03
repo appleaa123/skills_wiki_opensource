@@ -52,12 +52,20 @@ def adopt(slug: str) -> dict:
         raise ValueError(f"'{slug}' is no longer at {source} — run: skillswiki scan")
     if _exists(target):
         raise ValueError(f"{target} already exists; move or remove it first")
+    digest = fingerprint(source)  # before the move: an unreadable file stops us with nothing moved
     shutil.move(str(source), str(target))
-    with store.connect() as conn:
-        conn.execute("UPDATE skills SET status = 'adopted', path = ?, origin_path = ?, fingerprint = ?, "
-                     "adopted_at = ?, updated_at = ? WHERE slug = ?",
-                     (str(target), str(source), fingerprint(target), store.now(), store.now(), slug))
-    others = [c["path"] for c in discovery.scan()["conflicts"] if c["slug"] == slug]
+    try:
+        with store.connect() as conn:
+            conn.execute("UPDATE skills SET status = 'adopted', path = ?, origin_path = ?, fingerprint = ?, "
+                         "adopted_at = ?, updated_at = ? WHERE slug = ?",
+                         (str(target), str(source), digest, store.now(), store.now(), slug))
+    except Exception:
+        shutil.move(str(target), str(source))  # keep adopt all-or-nothing
+        raise
+    try:
+        others = [c["path"] for c in discovery.scan()["conflicts"] if c["slug"] == slug]
+    except Exception:
+        others = []  # informational only: never fail an adopt that already succeeded
     return {"slug": slug, "from": str(source), "to": str(target), "other_copies": others}
 
 

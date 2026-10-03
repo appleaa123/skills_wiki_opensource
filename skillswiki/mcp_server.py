@@ -14,7 +14,8 @@ INSTRUCTIONS = (
     "user's request. If it returns a skill, load it with load_skill and follow it. If it returns a shortlist, pick "
     "one that clearly fits and load it, or proceed without a skill. load_skill returns the skill's folder on disk: "
     "read or run its files from there. If the user corrects how a skill is applied, or asks you to remember "
-    "something specific to a skill, record it with learning_record (call learning_list first)."
+    "something specific to a skill, record it with learning_record (call learning_list first). If Learning Mode is "
+    "off, tell the user they can turn it on with: skillswiki config set learning on"
 )
 
 mcp = FastMCP("skills-wiki", instructions=INSTRUCTIONS)
@@ -69,6 +70,11 @@ def learning_record(slug: str, body: str, supersedes: list[int] | None = None) -
         body: The learning, written as an instruction for next time.
         supersedes: Optional ids (from learning_list or [#id] markers in a loaded skill) this one replaces.
     """
+    if not learnings.enabled():
+        return {"error": learnings.LEARNING_OFF_MESSAGE}
+    problem = _guard(learnings.require_adopted, slug)
+    if problem:
+        return problem
     result = _guard(learnings.record, slug, body, supersedes)
     return result if isinstance(result, dict) else {"status": "ok", "id": result}
 

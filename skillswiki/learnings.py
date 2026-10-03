@@ -109,6 +109,17 @@ def retire(learning_id: int) -> None:
                      (store.now(), learning_id))
 
 
+def require_adopted(slug: str) -> None:
+    """Learnings are injected when Skills Wiki loads a skill, so they only make sense for adopted skills."""
+    with store.connect() as conn:
+        row = conn.execute("SELECT status FROM skills WHERE slug = ?", (slug,)).fetchone()
+    if row is None:
+        raise ValueError(f"skill '{slug}' not found — check the slug with list_skills / skillswiki list")
+    if row["status"] != "adopted":
+        raise ValueError(f"skill '{slug}' is not adopted; learnings apply only to skills Skills Wiki loads "
+                         f"(run: skillswiki adopt {slug})")
+
+
 def block_for(slug: str) -> str:
     """The <learnings> block plus the reminder, or "" when Learning Mode is off. Never raises: it rides
     inside every skill load, so a store problem degrades to no block rather than a failed load."""

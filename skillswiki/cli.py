@@ -99,6 +99,8 @@ def cmd_enrich(args) -> None:
 
 def cmd_learn(args) -> None:
     if args.action == "add":
+        if learnings.enabled():
+            learnings.require_adopted(args.slug)
         new_id = learnings.record(args.slug, args.text, supersedes=_csv_ints(args.supersedes))
         _print({"status": "ok", "id": new_id}, args.json, f"Recorded learning #{new_id} for {args.slug}.")
     elif args.action == "list":
@@ -185,9 +187,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    paths.load_env()
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["hook"]:  # runs on every prompt: never print a traceback, always exit 0
+        from skillswiki import hook
+        hook.main()
+        return 0
     args = build_parser().parse_args(argv)
     try:
+        paths.load_env()
         args.func(args)
     except ValueError as exc:
         print(f"skillswiki: {exc}", file=sys.stderr)

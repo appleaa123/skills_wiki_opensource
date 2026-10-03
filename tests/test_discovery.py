@@ -71,3 +71,13 @@ def test_sync_db_upserts_and_removes(tmp_home):
     report = discovery.sync_db()
     assert report["removed"] == ["meeting-notes"]
     assert "meeting-notes" not in _rows()
+
+
+def test_scan_skips_unreadable_skill(tmp_home):
+    native = install_fixture_skills(tmp_home / "native")
+    (native / "meeting-notes" / "SKILL.md").chmod(0)
+    try:
+        slugs = {s["slug"] for s in discovery.scan()["skills"]}
+        assert slugs == {"email-polisher", "csv-cleaner"}
+    finally:
+        (native / "meeting-notes" / "SKILL.md").chmod(0o644)

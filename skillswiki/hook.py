@@ -37,6 +37,8 @@ def respond(payload: dict) -> str:
 
 def main() -> None:
     try:
+        from skillswiki import paths
+        paths.load_env()
         out = respond(json.loads(sys.stdin.read() or "{}"))
     except Exception:
         out = ""

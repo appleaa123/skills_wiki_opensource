@@ -42,3 +42,12 @@ def test_errors_never_block(adopted, monkeypatch, capsys):
 def test_context_line_for_confident_pick():
     line = hook.context_line({"skill": "email-polisher", "confidence": 0.93, "shortlist": []})
     assert "email-polisher" in line and "0.93" in line
+
+
+def test_cli_hook_is_fail_safe_with_broken_env(adopted, monkeypatch, capsys):
+    from skillswiki import cli, paths
+    (paths.home() / ".env").write_bytes(b"\xff\xfe broken \x00")
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"prompt": "please fix my email draft before I send it"})))
+    assert cli.main(["hook"]) == 0
+    out = capsys.readouterr()
+    assert out.err == ""

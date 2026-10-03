@@ -53,3 +53,9 @@ def test_load_env_reads_home_dotenv_without_overriding(tmp_home, monkeypatch):
     import os
     assert os.environ["TYPESAFE_API_KEY"] == "abc"
     assert os.environ["SKILLSWIKI_JEV"] == "on"
+
+
+def test_relative_extra_scan_root_is_made_absolute(tmp_home, monkeypatch):
+    monkeypatch.setenv("SKILLSWIKI_SCAN_ROOTS", "relative/skills")
+    assert paths.scan_roots()[-1] == tmp_home / "work" / "relative" / "skills"
+    assert paths.scan_roots()[-1].is_absolute()

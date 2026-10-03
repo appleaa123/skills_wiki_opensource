@@ -52,3 +52,10 @@ def test_errors_are_returned_not_raised(tmp_home):
     store.set_setting("learning", "off")
     assert "Learning Mode is off" in _call("learning_record", {"slug": "x", "body": "y"})["error"]
     assert "Learning Mode is off" in _call("learning_list", {"slug": "x"})["error"]
+
+
+def test_learning_for_unknown_or_native_skill_refused(tmp_home):
+    install_fixture_skills(tmp_home / "native")
+    discovery.sync_db()
+    assert "not found" in _call("learning_record", {"slug": "typo", "body": "x"})["error"]
+    assert "not adopted" in _call("learning_record", {"slug": "csv-cleaner", "body": "x"})["error"]

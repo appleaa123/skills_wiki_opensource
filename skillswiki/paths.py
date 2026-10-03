@@ -60,7 +60,7 @@ def scan_roots() -> list[Path]:
     candidates = [Path.home() / d for d in AGENT_SKILL_DIRS]
     candidates += [Path.cwd() / d for d in AGENT_SKILL_DIRS]
     extra = os.getenv(SCAN_ROOTS_ENV, "")
-    candidates += [Path(p).expanduser() for p in extra.split(":") if p.strip()]
+    candidates += [Path(p).expanduser().absolute() for p in extra.split(":") if p.strip()]
     roots, seen = [], set()
     for path in candidates:
         key = path.resolve()

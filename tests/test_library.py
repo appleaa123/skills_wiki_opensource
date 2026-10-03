@@ -126,3 +126,31 @@ def test_adopt_reports_other_native_copies(tmp_home):
     discovery.sync_db()
     result = library.adopt("email-polisher")
     assert result["other_copies"] == [str(tmp_home / "userhome" / ".agents" / "skills" / "email-polisher")]
+
+
+def test_adopt_rolls_back_when_db_update_fails(native, monkeypatch):
+    def broken_connect():
+        raise RuntimeError("disk full")
+    calls = {"n": 0}
+    real = store.connect
+
+    def flaky():
+        calls["n"] += 1
+        return real() if calls["n"] == 1 else broken_connect()
+    monkeypatch.setattr(library.store, "connect", flaky)
+    with pytest.raises(RuntimeError, match="disk full"):
+        library.adopt("email-polisher")
+    monkeypatch.setattr(library.store, "connect", real)
+    assert (native / "email-polisher" / "SKILL.md").is_file()
+    assert not (paths.library_dir() / "email-polisher").exists()
+    assert _row("email-polisher")["status"] == "native"
+
+
+def test_adopt_survives_unreadable_skill_elsewhere(native, tmp_home):
+    bad = install_fixture_skills(tmp_home / "userhome" / ".agents" / "skills", ["meeting-notes"]) / "meeting-notes"
+    (bad / "SKILL.md").chmod(0)
+    try:
+        result = library.adopt("email-polisher")
+        assert result["other_copies"] == []
+    finally:
+        (bad / "SKILL.md").chmod(0o644)

@@ -71,7 +71,10 @@ def scan() -> dict:
 
     skills, conflicts, seen = [], [], {}
     for folder, status, slug in candidates:
-        entry = _entry(folder, status, slug)
+        try:
+            entry = _entry(folder, status, slug)
+        except OSError:
+            continue  # unreadable SKILL.md: skip it rather than fail the whole scan
         if entry["slug"] in seen:
             conflicts.append({"slug": entry["slug"], "path": entry["path"], "kept": seen[entry["slug"]]})
             continue

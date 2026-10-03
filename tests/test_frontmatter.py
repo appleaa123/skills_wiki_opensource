@@ -49,3 +49,13 @@ def test_unterminated_frontmatter_is_body():
 def test_lists_and_comments_ignored():
     fm, _ = frontmatter.split("---\n# comment\nname: x\ntags:\n  - a\n  - b\nallowed-tools: Read, Bash\n---\n")
     assert fm == {"name": "x", "tags": "", "allowed-tools": "Read, Bash"}
+
+
+def test_hash_inside_quotes_is_kept():
+    fm, _ = frontmatter.split('---\ndescription: "Use the #1 rule"\nname: x # trailing comment\n---\n')
+    assert fm == {"description": "Use the #1 rule", "name": "x"}
+
+
+def test_plain_multiline_scalar_is_joined():
+    fm, _ = frontmatter.split("---\ndescription: Turns notes\n  into a plan\n  with owners.\nname: x\n---\n")
+    assert fm == {"description": "Turns notes into a plan with owners.", "name": "x"}

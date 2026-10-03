@@ -14,12 +14,6 @@ _BLOCK = re.compile(r"^[>|][+-]?$")
 _FALLBACK_MAX_CHARS = 200
 
 
-def _unquote(value: str) -> str:
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
-        return value[1:-1]
-    return value
-
-
 def _parse(lines: list[str]) -> dict:
     data: dict[str, str] = {}
     i = 0
@@ -36,8 +30,15 @@ def _parse(lines: list[str]) -> dict:
                 block.append(lines[i].strip())
                 i += 1
             data[key] = " ".join(part for part in block if part)
+        elif value and value[0] in "'\"":
+            end = value.find(value[0], 1)
+            data[key] = value[1:end] if end > 0 else value[1:]
         else:
-            data[key] = _unquote(value.split(" #", 1)[0].strip())
+            parts = [value.split(" #", 1)[0].strip()]
+            while parts[0] and i < len(lines) and lines[i][:1] in " \t" and lines[i].strip():
+                parts.append(lines[i].strip())  # plain scalar continued on indented lines
+                i += 1
+            data[key] = " ".join(parts)
     return data
 
 
