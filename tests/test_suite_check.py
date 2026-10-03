@@ -113,3 +113,10 @@ def test_no_key_no_jev(adopted, monkeypatch):
     write_suite()
     monkeypatch.setattr(suite_check, "get_decision_backend", lambda: pytest.fail("JEV must not be called"))
     assert "jev" not in suite_check.check("email-polisher")
+
+
+def test_slug_rules():
+    assert suite.suite_dir("My Skill").name == "My Skill"
+    for bad in ("../x", "a/b", "..", "", "a\\b"):
+        with pytest.raises(ValueError, match="invalid skill slug"):
+            suite.suite_dir(bad)

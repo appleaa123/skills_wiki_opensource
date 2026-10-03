@@ -22,7 +22,7 @@ def adopted(tmp_home, monkeypatch):
 
 
 def _use(monkeypatch, backend):
-    monkeypatch.setattr(jev_route, "get_decision_backend", lambda: backend)
+    monkeypatch.setattr(jev_route, "get_decision_backend", lambda deadline=None: backend)
     return backend
 
 
@@ -80,3 +80,23 @@ def test_prefilter_caps_candidates(adopted, monkeypatch):
     skills = {f"s{i}": {} for i in range(5)}
     assert len(jev_route.candidates("zzz unmatched", skills)) == 2
     assert jev_route.candidates("please fix my email draft", jev_route._adopted())[0] == "email-polisher"
+
+
+def test_routing_has_a_time_budget(adopted, monkeypatch):
+    seen = {}
+
+    def fake(deadline=None):
+        seen["deadline"] = deadline
+        return FakeBackend({}, fail=True)
+    monkeypatch.setattr(jev_route, "get_decision_backend", fake)
+    monkeypatch.setattr(jev_route.time, "monotonic", lambda: 100.0)
+    suggest("please fix my email draft", budget_s=5.0)
+    assert seen["deadline"] == 105.0
+    suggest("please fix my email draft")
+    assert seen["deadline"] == 100.0 + jev_route.DEFAULT_BUDGET_S
+
+
+def test_backend_gets_the_deadline(monkeypatch):
+    from skillswiki.decision import get_decision_backend
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    assert get_decision_backend(deadline=42.0)._deadline == 42.0

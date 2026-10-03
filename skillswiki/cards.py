@@ -10,6 +10,7 @@ from skillswiki.evals.backends import get_backend
 from skillswiki.textjson import extract_object
 
 FIELDS = ("examples", "keywords", "not_for")
+BACKENDS = ("claude", "codex", "gemini")
 MAX_ITEMS = 15
 MAX_ITEM_CHARS = 200
 SKILL_TEXT_MAX_CHARS = 12000
@@ -81,6 +82,8 @@ def enrich(slug: str, backend: str = "claude") -> dict:
     CLI fails, ValueError if it twice returns something that is not a valid card."""
     from pathlib import Path
 
+    if backend not in BACKENDS:
+        raise ValueError(f"backend must be one of {', '.join(BACKENDS)}")
     row = _skill_row(slug)
     skill_text = (Path(row["path"]) / frontmatter.SKILL_FILE).read_text(encoding="utf-8", errors="replace")
     prompt = ENRICH_PROMPT.format(skill=skill_text[:SKILL_TEXT_MAX_CHARS])

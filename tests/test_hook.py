@@ -51,3 +51,10 @@ def test_cli_hook_is_fail_safe_with_broken_env(adopted, monkeypatch, capsys):
     assert cli.main(["hook"]) == 0
     out = capsys.readouterr()
     assert out.err == ""
+
+
+def test_hook_passes_its_time_budget(adopted, monkeypatch, capsys):
+    seen = {}
+    monkeypatch.setattr("skillswiki.route.suggest", lambda r, budget_s=None: seen.update(b=budget_s) or {"shortlist": []})
+    _run(monkeypatch, capsys, json.dumps({"prompt": "please fix my email draft before I send it"}))
+    assert seen["b"] == hook.BUDGET_S

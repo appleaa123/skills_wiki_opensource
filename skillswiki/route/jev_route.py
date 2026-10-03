@@ -4,6 +4,7 @@ the top ones' fit. A single skill is suggested only at fit >= SUGGEST_BAR; other
 agent. Any JEV failure falls back to keyword routing.
 """
 import json
+import time
 from pathlib import Path
 
 from skillswiki import frontmatter, store
@@ -17,6 +18,7 @@ SUGGEST_BAR = 0.85
 PREFILTER_K = 40
 CARD_EXAMPLES_IN_LINE = 3
 DESCRIBE_CHARS = DEFAULTS["detail_chars"]
+DEFAULT_BUDGET_S = 8.0  # all JEV calls for one request; past it, routing falls back to keywords
 
 NOTE_SUGGESTED = "JEV picked this skill with high confidence. Load it with load_skill and follow it."
 NOTE_BELOW_BAR = ("No confident pick. If shortlist[0] fits the request, offer it to the user or load it; otherwise "
@@ -66,12 +68,13 @@ def _describe(skills: dict[str, dict]):
     return describe
 
 
-def suggest_jev(request: str) -> dict:
+def suggest_jev(request: str, budget_s: float = DEFAULT_BUDGET_S) -> dict:
     skills = _adopted()
     slugs = candidates(request, skills)
     if not slugs:
         return keyword.suggest_keyword(request)
-    s = route(request, catalog(slugs, skills), get_decision_backend(), DEFAULTS, describe=_describe(skills))
+    backend = get_decision_backend(deadline=time.monotonic() + budget_s)
+    s = route(request, catalog(slugs, skills), backend, DEFAULTS, describe=_describe(skills))
     if s.reason == "unavailable":
         return {**keyword.suggest_keyword(request), "fallback": "keyword"}
     shortlist = [{"skill": slug, "fit": round(fit, 3)} for slug, fit in s.shortlist]

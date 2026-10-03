@@ -22,10 +22,11 @@ def jev_enabled() -> bool:
     return bool(os.getenv(KEY_ENV, "").strip()) and os.getenv(SWITCH_ENV, "").strip().lower() not in _OFF
 
 
-def get_decision_backend() -> DecisionBackend:
-    """The JEV backend when jev_enabled(), else NullBackend (every call raises DecisionUnavailable)."""
+def get_decision_backend(deadline: float | None = None) -> DecisionBackend:
+    """The JEV backend when jev_enabled(), else NullBackend (every call raises DecisionUnavailable).
+    `deadline` is a time.monotonic() value no call or retry may run past (then DecisionUnavailable)."""
     if not jev_enabled():
         return NullBackend()
     from skillswiki.decision.jev import DEFAULT_MODEL, JevBackend  # vendor code loads only when enabled
 
-    return JevBackend(os.getenv(KEY_ENV, "").strip(), model=os.getenv(MODEL_ENV, DEFAULT_MODEL))
+    return JevBackend(os.getenv(KEY_ENV, "").strip(), model=os.getenv(MODEL_ENV, DEFAULT_MODEL), deadline=deadline)

@@ -8,6 +8,7 @@ import json
 import sys
 
 MIN_PROMPT_CHARS = 15
+BUDGET_S = 5.0  # well inside Claude Code's hook timeout; past it, keyword routing answers
 SHORTLIST_SHOWN = 3
 EVENT = "UserPromptSubmit"
 
@@ -29,7 +30,7 @@ def respond(payload: dict) -> str:
     if len(prompt) < MIN_PROMPT_CHARS or prompt.startswith("/"):
         return ""
     from skillswiki.route import suggest
-    line = context_line(suggest(prompt))
+    line = context_line(suggest(prompt, budget_s=BUDGET_S))
     if not line:
         return ""
     return json.dumps({"hookSpecificOutput": {"hookEventName": EVENT, "additionalContext": line}})

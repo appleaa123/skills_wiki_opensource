@@ -81,3 +81,8 @@ def test_enrich_backend_failure_propagates(skills, monkeypatch):
     monkeypatch.setattr(cards, "get_backend", lambda name: Down())
     with pytest.raises(BackendUnavailable):
         cards.enrich("email-polisher")
+
+
+def test_enrich_unknown_backend(skills):
+    with pytest.raises(ValueError, match="backend must be one of"):
+        cards.enrich("email-polisher", "evil")

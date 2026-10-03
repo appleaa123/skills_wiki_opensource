@@ -10,12 +10,13 @@ from pathlib import Path
 from skillswiki import frontmatter, paths, store
 
 STATUSES = ("draft", "checked")
-_SAFE_SLUG_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.")
+_UNSAFE_SLUG_CHARS = frozenset("/\\\0")
 
 
 def suite_dir(slug: str) -> Path:
-    if not slug or not set(slug) <= _SAFE_SLUG_CHARS or slug in (".", ".."):
-        raise ValueError(f"invalid skill slug {slug!r}")
+    """Any folder name works except ones that could escape the suites folder."""
+    if not slug or set(slug) & _UNSAFE_SLUG_CHARS or slug in (".", ".."):
+        raise ValueError(f"invalid skill slug {slug!r}: it must not contain '/', '\\' or be '.' / '..'")
     return paths.suites_dir() / slug
 
 

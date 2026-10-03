@@ -39,8 +39,12 @@ def _learnings(slug: str, arms: list[str]) -> tuple[str | None, dict | None]:
 def _confirm(args, message: str) -> None:
     if args.tier in CONFIRM_TIERS and not args.yes:
         print(message, file=sys.stderr)
-        if input("Continue? [y/N] ").strip().lower() != "y":
-            raise ValueError("cancelled")
+        try:
+            answer = input("Continue? [y/N] ")
+        except EOFError:
+            answer = ""
+        if answer.strip().lower() != "y":
+            raise ValueError("cancelled (pass --yes to run without asking)")
 
 
 def _unique_result_path(slug: str):
@@ -160,8 +164,15 @@ def cmd_accept(args) -> None:
 def cmd_generate(args) -> None:
     from skillswiki.evals import generator
 
-    print(f"Asking {args.backend} to draft an eval suite for {args.slug} (uses your own AI tokens)...", file=sys.stderr)
-    result = generator.generate(args.slug, args.backend, overwrite=args.overwrite)
+    from skillswiki.evals.backends import BackendUnavailable
+
+    try:
+        suite.skill_body(args.slug)  # adopted? (before any token is spent)
+        print(f"Asking {args.backend} to draft an eval suite for {args.slug} (uses your own AI tokens)...",
+              file=sys.stderr)
+        result = generator.generate(args.slug, args.backend, overwrite=args.overwrite)
+    except (BackendUnavailable, RuntimeError) as exc:
+        raise ValueError(str(exc)) from exc
     if args.json:
         print(json.dumps(result))
         return
@@ -173,7 +184,12 @@ def cmd_generate(args) -> None:
 def cmd_check(args) -> None:
     from skillswiki.evals import suite_check
 
-    result = suite_check.check(args.slug, llm=args.llm, backend=args.backend)
+    from skillswiki.evals.backends import BackendUnavailable
+
+    try:
+        result = suite_check.check(args.slug, llm=args.llm, backend=args.backend)
+    except (BackendUnavailable, RuntimeError) as exc:
+        raise ValueError(str(exc)) from exc
     if args.json:
         print(json.dumps(result, indent=2))
     else:

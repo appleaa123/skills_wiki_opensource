@@ -92,8 +92,13 @@ def cmd_card(args) -> None:
 
 
 def cmd_enrich(args) -> None:
+    from skillswiki.evals.backends import BackendUnavailable
+
     print(f"Asking {args.backend} to draft a routing card (uses your own AI tokens)...", file=sys.stderr)
-    card = cards.enrich(args.slug, args.backend)
+    try:
+        card = cards.enrich(args.slug, args.backend)
+    except BackendUnavailable as exc:
+        raise ValueError(str(exc)) from exc
     _print(card, args.json, json.dumps(card, indent=2))
 
 
@@ -133,7 +138,10 @@ def cmd_ui(args) -> None:
 
     from skillswiki.web.server import make_server
 
-    server = make_server(args.port)
+    try:
+        server = make_server(args.port)
+    except OSError as exc:
+        raise ValueError(f"cannot listen on port {args.port} ({exc.strerror}); try --port {args.port + 1}") from exc
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     print(f"Skills Wiki page: {url} (Ctrl-C to stop)")
     if not args.no_open:
