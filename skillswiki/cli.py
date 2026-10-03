@@ -176,6 +176,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("value", nargs="?")
     p.set_defaults(func=cmd_config)
 
+    from skillswiki import cli_eval
+    cli_eval.register(sub)
+
     sub.add_parser("serve-mcp", help="run the MCP server over stdio").set_defaults(func=cmd_serve_mcp)
     sub.add_parser("hook", help="Claude Code UserPromptSubmit hook (reads stdin)").set_defaults(func=cmd_hook)
     return parser
