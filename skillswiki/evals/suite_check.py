@@ -143,5 +143,5 @@ def show(slug: str) -> str:
     rubric = suite.load_rubric(slug)
     lines = [f"Suite for {slug} ({suite.status(slug).get('status', 'unknown')}) at {suite.suite_dir(slug)}", "", "Tasks:"]
     lines += [f"  {t['id']} [{', '.join(t.get('tags') or [])}] {t['prompt']}" for t in tasks]
-    lines += ["", "Rubric:"] + [f"  {c['id']}: {c['desc']}" for c in _criteria(rubric)]
+    lines += ["", "Rubric:"] + [f"  {c['id']} [{c.get('kind', 'untagged')}]: {c['desc']}" for c in _criteria(rubric)]
     return "\n".join(lines)

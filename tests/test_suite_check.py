@@ -72,7 +72,7 @@ def test_llm_flags(adopted, monkeypatch):
 def test_show(adopted):
     write_suite()
     text = suite_check.show("email-polisher")
-    assert "t01 [implicit] Can you tidy this up" in text and "failure_mechanism:" in text
+    assert "t01 [implicit] Can you tidy this up" in text and "failure_mechanism [untagged]:" in text
 
 
 class FakeJev:

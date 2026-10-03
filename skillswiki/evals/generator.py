@@ -5,8 +5,10 @@ restating the skill's rules (a restating prompt lets the no-skill arm score like
 measures nothing), at least two `implicit` tasks, affirmative criteria. The result is a DRAFT for the user to
 review; no verify.py is generated (deterministic checks are hand-written if wanted).
 """
+import re
+
 from skillswiki import paths, usage
-from skillswiki.evals import suite
+from skillswiki.evals import rubric_lint, suite
 from skillswiki.evals.backends import get_backend
 from skillswiki.textjson import extract_object
 
@@ -14,6 +16,10 @@ SKILL_TEXT_MAX_CHARS = 20000
 GENERATE_TIMEOUT_S = 600
 MANDATORY_DIMENSIONS = ("failure_mechanism", "actionable_specificity", "high_risk_blacklist")
 VERIFIERS = frozenset({"rubric", "both", "deterministic"})
+# Money/health words on top of the linter's legal/safety vocabulary: a "style" tag on such a criterion is undone.
+_EXTRA_RISK_WORDS = re.compile(
+    r"\b(payments?|paid|pay|money|invoices?|refunds?|pric(e|es|ing)|billing|tax(es)?|loans?|credit|insurance|"
+    r"salary|wages?|dosage|medication|prescription|allerg\w*)\b", re.IGNORECASE)
 RETRY_SUFFIX = "\n\nReturn only the JSON object."
 
 
@@ -26,8 +32,9 @@ def _criteria(rubric: dict) -> list:
     return list(rubric.get("dimensions") or []) + list(rubric.get("items") or []) + list(rubric.get("applied") or [])
 
 
-def validate(slug: str, tasks, rubric) -> list[str]:
-    """Schema errors (empty list = valid)."""
+def validate(slug: str, tasks, rubric, require_kind: bool = False) -> list[str]:
+    """Schema errors (empty list = valid). `require_kind`: every criterion must carry a known `kind` (generated
+    suites); hand-written suites may leave it out (untagged = treated as factual)."""
     errors = []
     if not isinstance(tasks, list) or not tasks:
         return ["tasks must be a non-empty list"]
@@ -63,9 +70,26 @@ def validate(slug: str, tasks, rubric) -> list[str]:
             errors.append(f"rubric: every criterion needs string id and desc ({c!r:.80})")
             continue
         ids.append(c["id"])
+        kind, risk = c.get("kind"), c.get("risk")
+        if (require_kind or kind is not None) and kind not in rubric_lint.KINDS:
+            errors.append(f"rubric: {c['id']} needs kind in {sorted(rubric_lint.KINDS)}, got {kind!r}")
+        if risk is not None and risk not in rubric_lint.RISKS:
+            errors.append(f"rubric: {c['id']} risk must be one of {sorted(rubric_lint.RISKS)}, got {risk!r}")
     if len(ids) != len(set(ids)):
         errors.append("rubric: criterion ids must be unique")
     return errors
+
+
+def demote_risky_style(rubric: dict) -> list[str]:
+    """Safety net: a "style" criterion whose wording sounds legal, medical, financial or safety-related is set
+    back to "factual", so JEV can never pass it on its own. Returns the demoted ids (mutates `rubric`)."""
+    demoted = []
+    for c in _criteria(rubric):
+        desc = c.get("desc", "")
+        if c.get("kind") == "style" and (rubric_lint._RISK_WORDS.search(desc) or _EXTRA_RISK_WORDS.search(desc)):
+            c["kind"] = "factual"
+            demoted.append(c["id"])
+    return demoted
 
 
 def generate(slug: str, backend: str = "claude", overwrite: bool = False) -> dict:
@@ -80,12 +104,15 @@ def generate(slug: str, backend: str = "claude", overwrite: bool = False) -> dic
         reply = response["text"]
         tokens += sum(v for k, v in (response.get("usage") or {}).items() if k.endswith("tokens") and isinstance(v, int))
         data = extract_object(reply) or {}
-        problems = validate(slug, data.get("tasks"), data.get("rubric"))
+        problems = validate(slug, data.get("tasks"), data.get("rubric"), require_kind=True)
         if not problems:
             break
     usage.log(slug, "eval", tokens)
     if problems:
         raise ValueError(f"{backend} did not return a valid suite: {'; '.join(problems[:5])}")
+    demoted = demote_risky_style(data["rubric"])
     folder = suite.write(slug, data["tasks"], data["rubric"])
-    suite.set_status(slug, "draft", generated_by=backend)
-    return {"slug": slug, "path": str(folder), "tasks": len(data["tasks"]), "tokens": tokens}
+    suite.set_status(slug, "draft", generated_by=backend, demoted_to_factual=demoted)
+    kinds = sorted({c["kind"] for c in _criteria(data["rubric"])})
+    return {"slug": slug, "path": str(folder), "tasks": len(data["tasks"]), "tokens": tokens, "kinds": kinds,
+            "demoted_to_factual": demoted}

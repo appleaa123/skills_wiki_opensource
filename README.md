@@ -69,7 +69,8 @@ your own AI to draft one from the `SKILL.md`: six tasks a real user would type, 
 prompt carries hard-won rules. Tasks must not restate the skill's own instructions (if the task tells the AI how to
 do the job, the no-skill answer scores just as well and the test measures nothing). At least two tasks are plain
 requests with no style hints, to measure the skill's default behaviour. At least one tests a failure the skill
-warns against. Criteria are phrased as what a good answer does. Review it with `skillswiki eval show <slug>` and
+warns against. Criteria are phrased as what a good answer does, and each is tagged with its kind (factual,
+constraint, count, legal or style), which decides how far JEV may ever be trusted on it. Review it with `skillswiki eval show <slug>` and
 edit freely; it is yours.
 
 **2. Check the suite before spending tokens.** `skillswiki eval check <slug>` validates the files, lints the
@@ -115,8 +116,10 @@ on 2026-10-03. Claude did the work, Gemini judged, and the TypeSafe key was on.
   grades. That is the system working as designed: the generated rubric left criteria untagged, untagged criteria
   are treated as factual, and on factual criteria JEV may only *fail* an answer, never pass it. JEV rarely failed
   these good answers, so most criteria are still collecting evidence, and on two criteria it disagreed with the
-  judge, so those stay with the judge. Tag criteria `"kind": "style"` where a lenient grader is harmless, and JEV
-  can earn the right to settle them after enough agreeing runs.
+  judge, so those stay with the judge. Since this run, the generator tags every criterion's kind: `style` (tone,
+  clarity, structure) only where a lenient grade is harmless, which is where JEV can earn the right to settle grades
+  after enough agreeing runs; a `style` tag on anything that sounds legal, medical, financial or safety-related is
+  set back to `factual` automatically.
 
 ## JEV, honestly
 

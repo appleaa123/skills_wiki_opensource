@@ -31,8 +31,13 @@ Rules for every criterion "desc":
 6. Phrase it affirmatively: describe what a good output does ("Keeps every number from the inputs"), not a
    negation ("Does not invent numbers").
 7. A grader must be able to decide it from the output text alone.
-Optional per criterion: "kind" ("factual" | "constraint" | "count" | "style" | "legal") and "risk" ("low" | "high";
-use "high" for legal, safety or money rules).
+8. Tag EVERY criterion with "kind". It decides how far a fast automatic grader may be trusted on it:
+   - "factual": fidelity to the inputs or to facts (numbers, names, claims, dates). The cautious default.
+   - "constraint": a rule about something the output must leave out, phrased affirmatively.
+   - "count": a length or number rule (word limits, "at least two alternatives").
+   - "legal": legal, compliance, medical, safety or money rules. Also add "risk": "high".
+   - "style": tone, clarity, structure, formatting, section presence — ONLY where a lenient grade cannot hurt
+     the user. If in doubt, use "factual".
 
 THE SKILL (slug "<<SLUG>>"):
 <<SKILL>>

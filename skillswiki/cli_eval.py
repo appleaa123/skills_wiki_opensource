@@ -181,7 +181,10 @@ def cmd_generate(args) -> None:
         print(json.dumps(result))
         return
     print(f"Drafted {result['tasks']} tasks at {result['path']} ({result['tokens']:,} tokens).\n"
-          f"Review and edit the suite files before running: skillswiki eval show {args.slug}, then "
+          f"Criterion kinds: {', '.join(result['kinds'])}."
+          + (f" Set back to factual (wording sounds high-risk): {', '.join(result['demoted_to_factual'])}."
+             if result["demoted_to_factual"] else "")
+          + f"\nReview and edit the suite files before running: skillswiki eval show {args.slug}, then "
           f"skillswiki eval check {args.slug}")
 
 
