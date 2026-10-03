@@ -112,3 +112,9 @@ def test_hand_written_suites_may_stay_untagged():
 def test_more_risky_wording_is_demoted(desc):
     rubric = {"items": [{"id": "a", "desc": desc, "kind": "style"}]}
     assert generator.demote_risky_style(rubric) == ["a"]
+
+
+@pytest.mark.parametrize("desc", ["Keeps a harmonious tone.", "Adds detail only where warranted.",
+                                  "Investigates the user's goal before answering."])
+def test_ordinary_style_wording_is_not_demoted(desc):
+    assert generator.demote_risky_style({"items": [{"id": "a", "desc": desc, "kind": "style"}]}) == []

@@ -268,3 +268,21 @@ def test_release_skips_a_missing_stored_copy(tmp_home):
     shutil.rmtree(paths.library_dir() / ".copies" / "email-polisher" / "1")
     result = library.release("email-polisher")
     assert claude.is_dir() and not agents.exists() and result["missing_copies"] == [str(agents)]
+
+
+def test_relative_symlink_primary_is_refused(tmp_home):
+    real = install_fixture_skills(tmp_home / "elsewhere", ["meeting-notes"]) / "meeting-notes"
+    link = tmp_home / "native" / "meeting-notes"
+    os.symlink(os.path.relpath(real, link.parent), link)
+    discovery.sync_db()
+    with pytest.raises(ValueError, match="relative symlink"):
+        library.adopt("meeting-notes")
+    assert link.is_symlink() and (link / "SKILL.md").is_file()
+
+
+def test_release_with_library_folder_gone_is_clean(native):
+    import shutil
+    library.adopt("email-polisher")
+    shutil.rmtree(paths.library_dir() / "email-polisher")
+    with pytest.raises(ValueError, match="no longer in the library"):
+        library.release("email-polisher")

@@ -85,6 +85,9 @@ def adopt(slug: str) -> dict:
         raise ValueError(f"'{slug}' is no longer at {source} — run: skillswiki scan")
     if _exists(target):
         raise ValueError(f"{target} already exists; move or remove it first")
+    if source.is_symlink() and not os.path.isabs(os.readlink(source)):
+        raise ValueError(f"{source} is a relative symlink; moving it would break it. Make the link absolute, or "
+                         f"adopt the folder it points to ({source.resolve()})")
     digest = fingerprint(source)  # before any move: an unreadable file stops us with nothing moved
     identical, differing, linked = [], [], []
     others = _other_native_copies(slug, source)
@@ -131,6 +134,9 @@ def release(slug: str) -> dict:
     row = _row(slug)
     if row["status"] != "adopted" or not row["origin_path"]:
         raise ValueError(f"'{slug}' is not adopted")
+    if not _exists(Path(row["path"])):
+        raise ValueError(f"'{slug}' is no longer in the library ({row['path']}); nothing to release — run: "
+                         "skillswiki scan")
     copies = json.loads(row["copies"] or "[]")
     missing = [c["origin"] for c in copies if not _exists(Path(c["stored"]))]
     moves = [(Path(row["origin_path"]), Path(row["path"]))]

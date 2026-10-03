@@ -254,7 +254,16 @@ function confirmTokens(extra) {
 document.addEventListener("click", (event) => {
   const t = event.target;
   const d = t.dataset || {};
-  if (d.adopt) { event.stopPropagation(); return act(t, () => api("POST", skillPath(d.adopt, "adopt"), {}), `Adopted ${d.adopt}`); }
+  if (d.adopt) {
+    event.stopPropagation();
+    return act(t, async () => {
+      const r = await api("POST", skillPath(d.adopt, "adopt"), {});
+      const notes = [r.moved_copies.length ? `also moved ${r.moved_copies.length} identical cop${r.moved_copies.length > 1 ? "ies" : "y"}` : "",
+                     r.differing_copies.length ? `a different version is still active at ${r.differing_copies.join(", ")}` : "",
+                     r.linked_copies.length ? `left the symlink target at ${r.linked_copies.join(", ")}` : ""].filter(Boolean);
+      setTimeout(() => toast(`Adopted ${d.adopt}${notes.length ? ": " + notes.join("; ") : ""}`), 0);
+    });
+  }
   if (d.release) { event.stopPropagation(); return act(t, () => api("POST", skillPath(d.release, "release"), {}), `Released ${d.release}`); }
   if (d.enrich) {
     event.stopPropagation();

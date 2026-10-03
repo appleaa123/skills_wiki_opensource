@@ -54,7 +54,8 @@ def cmd_adopt(args) -> None:
     for other in result["moved_copies"]:
         human += f"\n  also moved an identical copy from {other} (release puts it back)"
     for other in result["linked_copies"]:
-        human += f"\n  note: {other} is the folder a symlink points to; left in place so the link keeps working"
+        human += (f"\n  note: {other} is the folder a symlink points to; left in place so the link keeps working "
+                  "(your agents can still trigger it natively from there)")
     for other in result["differing_copies"]:
         human += (f"\n  warning: a different version is still active natively at {other}; your agent may still "
                   "trigger it on its own. Remove it, or make it identical and adopt again.")
@@ -63,7 +64,12 @@ def cmd_adopt(args) -> None:
 
 def cmd_release(args) -> None:
     result = library.release(args.slug)
-    _print(result, args.json, f"Released {result['slug']}: {result['from']} -> {result['to']}")
+    human = f"Released {result['slug']}: {result['from']} -> {result['to']}"
+    for origin in result["restored_copies"]:
+        human += f"\n  also restored the copy at {origin}"
+    for origin in result["missing_copies"]:
+        human += f"\n  warning: the stored copy for {origin} was missing, so it was not restored"
+    _print(result, args.json, human)
 
 
 def cmd_suggest(args) -> None:

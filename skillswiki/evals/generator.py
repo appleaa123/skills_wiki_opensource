@@ -20,9 +20,9 @@ VERIFIERS = frozenset({"rubric", "both", "deterministic"})
 # mentions any of them is undone. A word list, so it can miss phrasings: review generated kinds before trusting them.
 _EXTRA_RISK_WORDS = re.compile(
     r"\b(payments?|paid|pay|money|invoices?|refunds?|pric(e|es|ing)|billing|tax(es)?|loans?|credit|insurance|"
-    r"salary|wages?|fees?|interest rates?|debt|mortgages?|invest\w*|lawyers?|attorneys?|contracts?|liabilit\w*|"
-    r"warrant\w*|lawsuits?|court|doctors?|physicians?|nurses?|drugs?|doses?|dosage|medication|prescriptions?|"
-    r"allerg\w*|symptoms?|emergenc\w*|injur\w*|harm\w*|self-harm|suicid\w*|danger\w*|hazard\w*)\b",
+    r"salary|wages?|fees?|interest rates?|debt|mortgages?|invest(ment|ments|ing|ors?)?|lawyers?|attorneys?|contracts?|liabilit\w*|"
+    r"warrant(y|ies)|lawsuits?|court|doctors?|physicians?|nurses?|drugs?|doses?|dosage|medication|prescriptions?|"
+    r"allerg\w*|symptoms?|emergenc\w*|injur\w*|harms?|harmful|self-harm|suicid\w*|danger\w*|hazard\w*)\b",
     re.IGNORECASE)
 RETRY_SUFFIX = "\n\nReturn only the JSON object."
 
