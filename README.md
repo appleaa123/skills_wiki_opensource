@@ -49,7 +49,9 @@ candidates and checks the top picks' fit. It suggests a single skill only when i
 otherwise your agent gets the shortlist. On Skills Wiki's own catalog and frozen task set, at that bar JEV was
 right **98.5%** of the time when it suggested, suggested on about **65%** of requests, and made **0%** wrong-tool and
 **0%** needless suggestions. Your library is different, so treat that as a strong guide, not a promise. If JEV is
-unreachable, routing falls back to keywords.
+unreachable, or takes more than a few seconds, routing falls back to keywords. In a live test with five adopted
+skills, each routed request used about 2,000–2,700 JEV tokens (about $0.0001); "what's the capital of France?"
+was correctly told no skill was needed.
 
 **Ways in.** The CLI (`skillswiki ...`) is the main interface. An MCP server over stdio gives agents five fixed
 tools (`suggest_skill`, `load_skill`, `list_skills`, `learning_record`, `learning_list`), the same five whether you
@@ -58,21 +60,62 @@ advice; it never pastes the skill and never blocks your prompt.
 
 ## How evaluation works
 
-<!-- OWNER WRITES THIS SECTION. Scaffold of the flow, for reference:
-1. Generate a suite: `skillswiki eval generate <slug>` (your AI drafts tasks.jsonl + rubric.json from SKILL.md:
-   prompts a real user would type, never restating the skill's rules; at least two "implicit" tasks; criteria
-   phrased affirmatively). Review it: `skillswiki eval show <slug>`.
-2. Check it before spending tokens: `skillswiki eval check <slug>` (schema, rubric lint, restatement heuristic;
-   with a key, one batched JEV pass flags restating or unrealistic prompts and ungradeable criteria; costs fractions
-   of a cent).
-3. Run it on your tokens: `skillswiki eval run <slug> --tier screen|publish` (each task with and without the skill).
-4. Grade: deterministic checks (optional verify.py) + an LLM judge + blind pairwise comparison. With a key,
-   `--cascade`: JEV grades every criterion; its grade becomes final only where your own runs show it agrees with
-   your judge (the calibration store starts empty). On Skills Wiki's study JEV was final on about 0–21% of grades.
-5. Benchmark: verdict (gain / noise / loss), delta with a confidence interval, pairwise wins/losses/ties, tokens.
-   `skillswiki eval accept <id>` sets the baseline; later runs are compared under the same conditions.
-6. Learnings: `--tier learning` measures whether your recorded learnings make the skill better.
--->
+A skill should make your AI's answers measurably better. Skills Wiki tests that the way you'd test any change:
+same tasks, with and without the skill, graded blind.
+
+**1. Generate a test suite.** Skills you install don't come with tests, so `skillswiki eval generate <slug>` asks
+your own AI to draft one from the `SKILL.md`: six tasks a real user would type, plus a rubric to grade them. The
+prompt carries hard-won rules. Tasks must not restate the skill's own instructions (if the task tells the AI how to
+do the job, the no-skill answer scores just as well and the test measures nothing). At least two tasks are plain
+requests with no style hints, to measure the skill's default behaviour. At least one tests a failure the skill
+warns against. Criteria are phrased as what a good answer does. Review it with `skillswiki eval show <slug>` and
+edit freely; it is yours.
+
+**2. Check the suite before spending tokens.** `skillswiki eval check <slug>` validates the files, lints the
+rubric, and flags task prompts that copy the skill's wording. With a TypeSafe key, JEV reads every prompt and
+criterion in one batched call and flags prompts that restate the skill, prompts that don't read like a real
+request, and criteria a grader couldn't decide from the answer alone.
+
+**3. Run it.** `skillswiki eval run <slug> --tier screen` (quick) or `--tier publish` (each task, with and without
+the skill, three times). Your AI CLI does the work on your plan; the token estimate is shown first.
+
+**4. Grade it.** Every answer is graded against the rubric by a judge, ideally a different AI from the one that
+did the work (`--judge gemini` while Claude works). The judge also compares the two answers to each task blind,
+in both orders, and picks the better one. With a key, `--cascade` lets JEV grade every criterion too. Its grade
+becomes final only where your own runs show it agrees with your judge; until then your judge decides and JEV's
+grades are stored as evidence (`skillswiki eval calibration <slug>`).
+
+**5. Read the benchmark.** A verdict (gain, noise or loss), the change in pass rate with a 95% confidence
+interval, blind wins/losses/ties, token cost, and named findings such as a check that only the skill passes.
+`skillswiki eval accept <id>` makes a run the baseline; later runs are compared with it only when measured the
+same way (same AI, judge, settings and rubric).
+
+**6. Learn.** Corrections you record (`skillswiki learn add`, or your agent via `learning_record`) are attached
+to the skill every time it loads. `--tier learning_screen` measures whether they actually help.
+
+### A real run
+
+`llm-approach-advisor` (one of our own skills: it recommends prompting vs RAG vs fine-tuning for an LLM project),
+on 2026-10-03. Claude did the work, Gemini judged, and the TypeSafe key was on.
+
+- **Suite:** generated in 50 seconds (~49,000 tokens). Six tasks, e.g. *"A couple of people on the team think we
+  should fine-tune a model on the docs so it 'really knows' the product. Is that the right call?"* JEV's check
+  cost **$0.00015** and flagged two criteria as hard to grade from the answer alone.
+- **Benchmark (publish tier, two runs, ~137,000 Claude tokens each, 6–10 minutes):** verdict **gain** both times.
+  The judge preferred the answer written with the skill **18 of 18** times in each run. Pass rate went from 33% to
+  67% in the first run and to 83% in the second, under identical settings: run-to-run noise is real, which is why
+  the interval (−22 to +78 points, then +6 to +89) is shown next to every delta.
+- **What the skill fixed:** naming rejected alternatives with reasons (100% with the skill vs 44% without) and
+  including a safety note. **What it still missed:** stating the constraints it relied on (11% with the skill).
+- **Learning:** one recorded learning targeting that gap ("list each constraint and label it from the inputs,
+  inferred, or unknown") took the pass rate from 67% to **100%**, preferred **6 of 6** times blind (one quick run
+  of six tasks; a small sample).
+- **JEV in the cascade:** ~116,000 JEV tokens, about **$0.005** per run. JEV made the final call on **0 of 468**
+  grades. That is the system working as designed: the generated rubric left criteria untagged, untagged criteria
+  are treated as factual, and on factual criteria JEV may only *fail* an answer, never pass it. JEV rarely failed
+  these good answers, so most criteria are still collecting evidence, and on two criteria it disagreed with the
+  judge, so those stay with the judge. Tag criteria `"kind": "style"` where a lenient grader is harmless, and JEV
+  can earn the right to settle them after enough agreeing runs.
 
 ## JEV, honestly
 
