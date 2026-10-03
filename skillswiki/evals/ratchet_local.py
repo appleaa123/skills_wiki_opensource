@@ -12,6 +12,7 @@ from pathlib import Path
 from skillswiki import store, usage
 
 COMPARISON = "skill_vs_no_skill"
+JUDGE_TOKENS_PER_CALL = 1500  # config.json per_call_estimate_tokens.judge
 
 
 def _grading_mismatch(result: dict, accepted: dict) -> str | None:
@@ -149,6 +150,17 @@ def accept(eval_id: int, regression_threshold_pp: float, force: bool = False) ->
     return {"accepted": eval_id, **comparison}
 
 
+def cascade_savings(results: dict, judge_tokens_per_call: int) -> dict | None:
+    """Judge calls the cascade avoided: outputs whose every criterion JEV (or a check) settled need no LLM call.
+    Tokens are an estimate (calls x the configured per-call judge estimate)."""
+    cascade = results.get("cascade")
+    if not cascade:
+        return None
+    outputs = results.get("tasks", 0) * results.get("n", 0) * len(results.get("arms") or {})
+    saved = max(0, outputs - (cascade.get("llm_judge_calls") or 0))
+    return {"outputs": outputs, "judge_calls_saved": saved, "judge_tokens_saved_est": saved * judge_tokens_per_call}
+
+
 def report(slug: str) -> list[dict]:
     """Every recorded run for a skill, newest first, with the headline numbers."""
     with store.connect() as conn:
@@ -163,5 +175,6 @@ def report(slug: str) -> list[dict]:
                     "ci": (res.get("stats") or {}).get("delta_pp_ci95"),
                     "pairwise": {k: pair.get(k) for k in ("wins", "losses", "ties")} if pair else None,
                     "cascade": res.get("cascade"),
+                    "cascade_savings": cascade_savings(res, JUDGE_TOKENS_PER_CALL),
                     "result_path": r["result_path"]})
     return out

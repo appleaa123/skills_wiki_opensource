@@ -56,3 +56,10 @@ def test_grading_change_names_the_reason(tmp_home):
 def test_unknown_eval(tmp_home):
     with pytest.raises(ValueError, match="not found"):
         ratchet_local.accept(99, 8)
+
+
+def test_cascade_savings():
+    res = {"tasks": 6, "n": 3, "arms": {"skill": {}, "no_skill": {}}, "cascade": {"llm_judge_calls": 30}}
+    assert ratchet_local.cascade_savings(res, 1500) == {"outputs": 36, "judge_calls_saved": 6,
+                                                       "judge_tokens_saved_est": 9000}
+    assert ratchet_local.cascade_savings({"tasks": 1}, 1500) is None

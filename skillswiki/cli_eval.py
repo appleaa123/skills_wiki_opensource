@@ -147,6 +147,10 @@ def cmd_report(args) -> None:
             print(f"    JEV cascade: {jev_final}/{c.get('verdicts')} grades final by JEV, "
                   f"{c.get('jev_input_tokens'):,} JEV tokens (${c.get('jev_cost_usd')}), "
                   f"{c.get('llm_judge_calls')} LLM judge calls")
+            saved = r.get("cascade_savings") or {}
+            if saved:
+                print(f"    saved ~{saved['judge_calls_saved']} of {saved['outputs']} judge calls "
+                      f"(~{saved['judge_tokens_saved_est']:,} judge tokens, estimate)")
 
 
 def cmd_accept(args) -> None:
