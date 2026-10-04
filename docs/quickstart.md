@@ -8,6 +8,7 @@ Install it so your AI agent can find the `skillswiki` command (a virtualenv is n
 
 ```bash
 # needs pipx: brew install pipx   (or: python3 -m pip install --user pipx), then once: pipx ensurepath
+# Windows: py -m pip install --user pipx   then once: py -m pipx ensurepath
 pipx install git+https://github.com/appleaa123/skills_wiki_opensource.git
 ```
 
@@ -17,7 +18,8 @@ adopting a skill moves its folder.
 Or from a clone: `pipx install .` — or use the absolute path of the console script, e.g.
 `/path/to/skills_wiki_opensource/.venv/bin/skillswiki`, everywhere `skillswiki` appears below.
 
-Optional settings (your own TypeSafe key for JEV, extra skill folders):
+Optional settings (your own TypeSafe key for JEV, extra skill folders separated by `:` on macOS/Linux or `;` on
+Windows). On Windows, `~` below means `%USERPROFILE%`:
 
 ```bash
 mkdir -p ~/.skillswiki && cp .env.example ~/.skillswiki/.env   # then edit it

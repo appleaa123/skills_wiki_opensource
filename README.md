@@ -13,14 +13,16 @@ requests, checks your test suites and grades through a cascade. Without a key, e
 
 Works with skills for **Claude Code, Codex and Antigravity** (folders containing a `SKILL.md`).
 
-> **Beta (v0.1).** Tested on macOS and Linux with Python 3.11–3.13; Windows is untested. Adopting a skill moves
-> its folder, so **back up your skills folders first** (`~/.claude/skills`, `~/.agents/skills`,
-> `~/.gemini/skills`, `~/.codex/skills`). See [Status and limits](#status-and-limits) before you rely on it.
+> **Beta (v0.1).** Runs on macOS, Linux and Windows with Python 3.11–3.13 (the test suite passes on all of them in
+> CI). Adopting a skill moves its folder, so **back up your skills folders first** (`~/.claude/skills`,
+> `~/.agents/skills`, `~/.gemini/skills`, `~/.codex/skills`; on Windows these live under `%USERPROFILE%`). See
+> [Status and limits](#status-and-limits) before you rely on it.
 
 ## Quickstart
 
 ```bash
 # needs pipx: brew install pipx   (or: python3 -m pip install --user pipx), then once: pipx ensurepath
+# Windows: py -m pip install --user pipx   then once: py -m pipx ensurepath
 pipx install git+https://github.com/appleaa123/skills_wiki_opensource.git
 skillswiki scan                    # find installed skills
 skillswiki adopt <slug>            # let Skills Wiki route and load it (reversible: skillswiki release <slug>)
@@ -174,7 +176,8 @@ What has been tested, and what to know before relying on it:
 - **The benchmark numbers above come from one skill**, so treat them as an example, not a promise.
 - **The JEV grading cascade** had not yet made a final grade in a live run when this was written (0 of 468).
   Generated suites now tag criterion kinds so it can earn trust on style criteria; that has not been confirmed live.
-- **Windows** is untested. **Python** 3.11, 3.12 and 3.13 are tested in CI.
+- **Windows** passes the full test suite in CI, but the real-agent and install tests so far ran on macOS. On
+  Windows, skill folders that are symlinks need Developer Mode. **Python** 3.11, 3.12 and 3.13 are tested in CI.
 
 ## Uninstall
 
@@ -182,6 +185,7 @@ What has been tested, and what to know before relying on it:
 skillswiki release --all           # put every adopted skill back where your agents expect it
 pipx uninstall skillswiki
 rm -rf ~/.skillswiki               # optional: your learnings, cards, eval results and settings
+                                   # Windows (PowerShell): Remove-Item -Recurse -Force $HOME\.skillswiki
 ```
 
 Uninstalling never deletes your skills. If you uninstall before releasing, adopted skills stay in
