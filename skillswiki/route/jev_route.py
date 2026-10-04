@@ -41,11 +41,14 @@ def _recently_used(slugs: list[str], k: int) -> list[str]:
 
 
 def candidates(request: str, skills: dict[str, dict]) -> list[str]:
-    ranked = [slug for slug, _ in keyword.shortlist(request, k=PREFILTER_K)]
-    if ranked:
-        return ranked
-    slugs = sorted(skills)
-    return slugs if len(slugs) <= PREFILTER_K else _recently_used(slugs, PREFILTER_K)
+    """Skills JEV chooses among: keyword matches first, then the rest. A small library (<= PREFILTER_K) is sent
+    whole, since a weak keyword hit on one skill must never hide the right skill from JEV; a large one keeps the
+    keyword matches and fills the remaining slots with recently used skills."""
+    ranked = [slug for slug, _ in keyword.shortlist(request, k=PREFILTER_K) if slug in skills]
+    rest = [slug for slug in sorted(skills) if slug not in ranked]
+    if len(skills) <= PREFILTER_K:
+        return ranked + rest
+    return (ranked + _recently_used(rest, PREFILTER_K))[:PREFILTER_K]
 
 
 def _line(skill: dict) -> str:

@@ -42,7 +42,8 @@ claude mcp add skills-wiki -- skillswiki serve-mcp
 
 The agent gets five tools: `suggest_skill`, `load_skill`, `list_skills`, `learning_record`, `learning_list`.
 
-**Claude Code hook (optional)** — routes every prompt automatically. Add to `.claude/settings.json`
+**Claude Code hook (recommended)** — routes every prompt automatically. Without it, agents often answer from
+their own knowledge and never check for a skill. Add to `.claude/settings.json`
 (project) or `~/.claude/settings.json` (all projects):
 
 ```json

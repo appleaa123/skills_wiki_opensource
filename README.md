@@ -56,8 +56,14 @@ was correctly told no skill was needed.
 
 **Ways in.** The CLI (`skillswiki ...`) is the main interface. An MCP server over stdio gives agents five fixed
 tools (`suggest_skill`, `load_skill`, `list_skills`, `learning_record`, `learning_list`), the same five whether you
-have 5 skills or 500. An optional Claude Code `UserPromptSubmit` hook routes every prompt and adds one line of
-advice; it never pastes the skill and never blocks your prompt.
+have 5 skills or 500. A Claude Code `UserPromptSubmit` hook routes every prompt and adds one line of advice; it
+never pastes the skill and never blocks your prompt.
+
+**Use the hook.** In real Claude Code and Antigravity sessions (2026-10-03), an agent that only had the MCP tools
+usually answered questions it felt sure about from its own knowledge, without checking for a skill. With the hook
+on, Claude Code loaded the suggested skill and followed it, and learnings recorded earlier showed up in the answer.
+Antigravity has no prompt hook yet: ask it to check Skills Wiki, and allow its MCP calls (in non-interactive mode
+it blocks them unless permissions are approved).
 
 ## How evaluation works
 

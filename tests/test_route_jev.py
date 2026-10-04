@@ -38,7 +38,8 @@ def test_confident_pick_suggests_one_skill(adopted, monkeypatch):
 
 
 def test_below_bar_returns_shortlist_only(adopted, monkeypatch):
-    _use(monkeypatch, FakeBackend({EMAIL_LINE: 0.9}, fit={EMAIL_LINE: 0.6}))
+    # unrelated skills are now candidates too (small library), so the fake gives them the low fit JEV would
+    _use(monkeypatch, FakeBackend({EMAIL_LINE: 0.9}, fit={EMAIL_LINE: 0.6, NOTES_LINE: 0.05, CSV_LINE: 0.05}))
     result = suggest("please fix my email draft")
     assert result["skill"] is None and result["reason"] == "below_bar"
     assert result["shortlist"][0]["skill"] == "email-polisher" and "shortlist[0]" in result["note"]
@@ -100,3 +101,16 @@ def test_backend_gets_the_deadline(monkeypatch):
     from skillswiki.decision import get_decision_backend
     monkeypatch.setenv("TYPESAFE_API_KEY", "k")
     assert get_decision_backend(deadline=42.0)._deadline == 42.0
+
+
+def test_small_library_sends_every_skill_to_jev(adopted):
+    # Found in a real Claude Code run: a weak keyword hit on one skill used to hide the right skill from JEV.
+    cands = jev_route.candidates("help me get started on my notes", jev_route._adopted())
+    assert set(cands) == {"email-polisher", "meeting-notes", "csv-cleaner"}
+    assert cands[0] == "meeting-notes"  # keyword matches still come first
+
+
+def test_large_library_pads_keyword_hits_with_recent_skills(adopted, monkeypatch):
+    monkeypatch.setattr(jev_route, "PREFILTER_K", 2)
+    cands = jev_route.candidates("my notes", jev_route._adopted())
+    assert cands[0] == "meeting-notes" and len(cands) == 2
