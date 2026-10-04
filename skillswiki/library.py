@@ -14,6 +14,10 @@ from skillswiki import discovery, paths, store
 
 FINGERPRINT_CHARS = 16
 COPIES_DIR = ".copies"  # library/.copies/<slug>/<n>: identical copies adopted along with a skill
+MANIFEST_NAME = "RESTORE.json"  # library/RESTORE.json: where every adopted folder came from, readable without us
+RESTORE_HELP = ("Skills Wiki moved these skill folders here when you adopted them. To put everything back, run: "
+                "skillswiki release --all. Without Skills Wiki installed, move each folder back by hand: "
+                "'library_path' goes to 'origin', and each copy's 'stored' path goes to its 'origin'.")
 _SKIP_NAMES = frozenset({"__pycache__", ".DS_Store"})
 
 
@@ -124,6 +128,7 @@ def adopt(slug: str) -> dict:
         _move_back(moves)  # keep adopt all-or-nothing
         _remove_empty_holding_dir(slug)
         raise
+    _refresh_manifest()
     return {"slug": slug, "from": str(source), "to": str(target), "moved_copies": [str(o) for o in identical],
             "other_copies": [str(o) for o in differing + linked], "differing_copies": [str(o) for o in differing],
             "linked_copies": [str(o) for o in linked]}
@@ -160,8 +165,43 @@ def release(slug: str) -> dict:
         raise
     if copies:
         _remove_empty_holding_dir(slug)
+    _refresh_manifest()
     return {"slug": slug, "from": str(moves[0][1]), "to": str(moves[0][0]),
             "restored_copies": [str(o) for o, _s in moves[1:]], "missing_copies": missing}
+
+
+def write_manifest() -> Path:
+    """Rewrite library/RESTORE.json from the store: a plain record of every adopted folder's origin, so skills
+    can be put back even after an uninstall or a lost database."""
+    with store.connect() as conn:
+        rows = conn.execute("SELECT slug, path, origin_path, copies FROM skills WHERE status = 'adopted' "
+                            "ORDER BY slug").fetchall()
+    manifest = {"how_to_restore_by_hand": RESTORE_HELP, "updated_at": store.now(),
+                "skills": {r["slug"]: {"library_path": r["path"], "origin": r["origin_path"],
+                                       "copies": json.loads(r["copies"] or "[]")} for r in rows}}
+    path = paths.library_dir() / MANIFEST_NAME
+    path.write_text(json.dumps(manifest, indent=2) + "\n")
+    return path
+
+
+def _refresh_manifest() -> None:
+    try:
+        write_manifest()
+    except Exception:
+        pass  # the store stays the source of truth; a failed manifest write must not undo a finished move
+
+
+def release_all() -> dict:
+    """Release every adopted skill. Keeps going past a failure and reports it."""
+    with store.connect() as conn:
+        slugs = [r["slug"] for r in conn.execute("SELECT slug FROM skills WHERE status = 'adopted' ORDER BY slug")]
+    released, failed = [], []
+    for slug in slugs:
+        try:
+            released.append(release(slug))
+        except (ValueError, OSError) as exc:
+            failed.append({"slug": slug, "error": str(exc)})
+    return {"released": released, "failed": failed}
 
 
 def changed(slug: str) -> bool:

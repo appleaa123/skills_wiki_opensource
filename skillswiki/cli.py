@@ -63,6 +63,10 @@ def cmd_adopt(args) -> None:
 
 
 def cmd_release(args) -> None:
+    if args.all:
+        return cmd_release_all(args)
+    if not args.slug:
+        raise ValueError("give a skill slug or --all")
     result = library.release(args.slug)
     human = f"Released {result['slug']}: {result['from']} -> {result['to']}"
     for origin in result["restored_copies"]:
@@ -70,6 +74,18 @@ def cmd_release(args) -> None:
     for origin in result["missing_copies"]:
         human += f"\n  warning: the stored copy for {origin} was missing, so it was not restored"
     _print(result, args.json, human)
+
+
+def cmd_release_all(args) -> None:
+    result = library.release_all()
+    if not result["released"] and not result["failed"]:
+        return _print(result, args.json, "No adopted skills to release.")
+    lines = [f"Released {len(result['released'])} skills back to their folders."]
+    lines += [f"  {r['slug']} -> {r['to']}" for r in result["released"]]
+    lines += [f"  FAILED {f['slug']}: {f['error']}" for f in result["failed"]]
+    _print(result, args.json, "\n".join(lines))
+    if result["failed"]:
+        raise ValueError(f"{len(result['failed'])} skill(s) could not be released; see above")
 
 
 def cmd_suggest(args) -> None:
@@ -180,11 +196,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--status", choices=["adopted", "native", "plugin"])
     p.set_defaults(func=cmd_list)
     for name, func, text in (("adopt", cmd_adopt, "move a skill into the Skills Wiki library"),
-                             ("release", cmd_release, "move an adopted skill back"),
                              ("load", cmd_load, "print an adopted skill with its learnings")):
         p = sub.add_parser(name, help=text)
         p.add_argument("slug")
         p.set_defaults(func=func)
+    p = sub.add_parser("release", help="move an adopted skill back (--all: every adopted skill)")
+    p.add_argument("slug", nargs="?")
+    p.add_argument("--all", action="store_true", help="release every adopted skill (run this before uninstalling)")
+    p.set_defaults(func=cmd_release)
     p = sub.add_parser("suggest", help="route a request to an adopted skill")
     p.add_argument("request")
     p.set_defaults(func=cmd_suggest)

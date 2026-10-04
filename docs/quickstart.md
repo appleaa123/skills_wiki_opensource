@@ -1,14 +1,18 @@
 # Quickstart
 
-Skills Wiki runs on your machine. It needs Python 3.11+ and at least one AI CLI (Claude Code, Codex or Gemini CLI).
+Skills Wiki runs on your machine. It needs Python 3.11+ and at least one AI CLI (Claude Code, Codex or Antigravity).
 
 ## 1. Install
 
 Install it so your AI agent can find the `skillswiki` command (a virtualenv is not on the agent's PATH):
 
 ```bash
+# needs pipx: brew install pipx   (or: python3 -m pip install --user pipx)
 pipx install git+https://github.com/appleaa123/skills_wiki_opensource.git
 ```
+
+Back up your skills folders first (`~/.claude/skills`, `~/.agents/skills`, `~/.gemini/skills`, `~/.codex/skills`):
+adopting a skill moves its folder.
 
 Or from a clone: `pipx install .` — or use the absolute path of the console script, e.g.
 `/path/to/skills_wiki_opensource/.venv/bin/skillswiki`, everywhere `skillswiki` appears below.
@@ -27,6 +31,7 @@ skillswiki scan                 # finds skills in ~/.claude/skills, ~/.codex/ski
 skillswiki list
 skillswiki adopt <slug>         # moves the skill into ~/.skillswiki/library — your agent stops auto-triggering it
 skillswiki release <slug>       # moves it back, byte-for-byte
+skillswiki release --all        # moves every adopted skill back (do this before uninstalling)
 ```
 
 Plugin-managed skills are listed but never moved. If the same skill is installed for several agents, identical

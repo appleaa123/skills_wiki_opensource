@@ -63,3 +63,16 @@ def test_console_script_help():
     bin_dir = __import__("pathlib").Path(sys.executable).parent
     result = subprocess.run([str(bin_dir / "skillswiki"), "--help"], capture_output=True, text=True)
     assert result.returncode == 0 and "adopt" in result.stdout
+
+
+def test_release_all_cli(tmp_home, capsys):
+    install_fixture_skills(tmp_home / "native")
+    run(capsys, "scan")
+    run(capsys, "adopt", "email-polisher")
+    run(capsys, "adopt", "csv-cleaner")
+    code, out, _ = run(capsys, "release", "--all")
+    assert code == 0 and "Released 2 skills" in out
+    code, out, _ = run(capsys, "release", "--all")
+    assert code == 0 and "No adopted skills" in out
+    code, _, err = run(capsys, "release")
+    assert code == 1 and "slug or --all" in err

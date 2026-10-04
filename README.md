@@ -11,11 +11,16 @@ your machine, with no account and no server of ours.
 Optional: bring your own [TypeSafe](https://typesafe.ai) key and **JEV**, a calibrated decision model, routes your
 requests, checks your test suites and grades through a cascade. Without a key, everything still works.
 
-Works with skills for **Claude Code, Codex and Gemini CLI** (folders containing a `SKILL.md`).
+Works with skills for **Claude Code, Codex and Antigravity** (folders containing a `SKILL.md`).
+
+> **Beta (v0.1).** Tested on macOS and Linux with Python 3.11–3.13; Windows is untested. Adopting a skill moves
+> its folder, so **back up your skills folders first** (`~/.claude/skills`, `~/.agents/skills`,
+> `~/.gemini/skills`, `~/.codex/skills`). See [Status and limits](#status-and-limits) before you rely on it.
 
 ## Quickstart
 
 ```bash
+# needs pipx: brew install pipx   (or: python3 -m pip install --user pipx)
 pipx install git+https://github.com/appleaa123/skills_wiki_opensource.git
 skillswiki scan                    # find installed skills
 skillswiki adopt <slug>            # let Skills Wiki route and load it (reversible: skillswiki release <slug>)
@@ -154,6 +159,35 @@ customer under their terms; Skills Wiki never sees your key. `SKILLSWIKI_JEV=off
   AI CLI and, with a key, to TypeSafe.
 - **Scripts.** A skill folder can contain scripts your agent may run. The page flags skills that contain scripts
   and skills whose files changed since you adopted them.
+
+## Status and limits
+
+What has been tested, and what to know before relying on it:
+
+- **Use the Claude Code hook.** Without it, agents usually answer from their own knowledge and never check for a
+  skill. With it, routing is automatic.
+- **Antigravity** works through MCP, but has no prompt hook yet, so ask it to check Skills Wiki. In
+  non-interactive mode it blocks MCP calls unless you approve permissions.
+- **Codex** skill folders and the Codex judge are covered by tests only, not by a live Codex session yet.
+- **JEV is not fully deterministic.** About 5.6% of its picks changed between identical runs, and a borderline
+  request is sometimes judged as needing no skill; the shortlist and keyword fallback still apply.
+- **The benchmark numbers above come from one skill**, so treat them as an example, not a promise.
+- **The JEV grading cascade** had not yet made a final grade in a live run when this was written (0 of 468).
+  Generated suites now tag criterion kinds so it can earn trust on style criteria; that has not been confirmed live.
+- **Windows** is untested. **Python** 3.11, 3.12 and 3.13 are tested in CI.
+
+## Uninstall
+
+```bash
+skillswiki release --all           # put every adopted skill back where your agents expect it
+pipx uninstall skillswiki
+rm -rf ~/.skillswiki               # optional: your learnings, cards, eval results and settings
+```
+
+Uninstalling never deletes your skills. If you uninstall before releasing, adopted skills stay in
+`~/.skillswiki/library/`, and reinstalling then running `skillswiki release --all` puts them back. Without Skills
+Wiki at all, `~/.skillswiki/library/RESTORE.json` lists where every folder came from, so you can move them back by
+hand.
 
 ## Want it done for you?
 

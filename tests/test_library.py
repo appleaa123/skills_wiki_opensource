@@ -286,3 +286,48 @@ def test_release_with_library_folder_gone_is_clean(native):
     shutil.rmtree(paths.library_dir() / "email-polisher")
     with pytest.raises(ValueError, match="no longer in the library"):
         library.release("email-polisher")
+
+
+# ── release everything + recovery manifest ─────────────────────────────
+
+
+def test_release_all_restores_every_adopted_skill(native, tmp_home):
+    install_fixture_skills(tmp_home / "userhome" / ".agents" / "skills", ["meeting-notes"])
+    discovery.sync_db()
+    for slug in ("email-polisher", "meeting-notes"):
+        library.adopt(slug)
+    result = library.release_all()
+    assert sorted(r["slug"] for r in result["released"]) == ["email-polisher", "meeting-notes"]
+    assert result["failed"] == []
+    assert (native / "email-polisher").is_dir() and (native / "meeting-notes").is_dir()
+    assert (tmp_home / "userhome" / ".agents" / "skills" / "meeting-notes").is_dir()
+
+
+def test_release_all_keeps_going_after_a_failure(native):
+    library.adopt("email-polisher")
+    library.adopt("csv-cleaner")
+    (native / "email-polisher").mkdir()  # origin occupied: this one must fail, the other still released
+    result = library.release_all()
+    assert [r["slug"] for r in result["released"]] == ["csv-cleaner"]
+    assert result["failed"][0]["slug"] == "email-polisher" and "already exists" in result["failed"][0]["error"]
+
+
+def test_recovery_manifest_tracks_adopted_skills(native, tmp_home):
+    import json
+    install_fixture_skills(tmp_home / "userhome" / ".agents" / "skills", ["email-polisher"])
+    discovery.sync_db()
+    library.adopt("email-polisher")
+    manifest = json.loads((paths.library_dir() / library.MANIFEST_NAME).read_text())
+    entry = manifest["skills"]["email-polisher"]
+    origins = {entry["origin"], *(c["origin"] for c in entry["copies"])}
+    assert origins == {str(native / "email-polisher"),
+                       str(tmp_home / "userhome" / ".agents" / "skills" / "email-polisher")}
+    assert "move each folder back" in manifest["how_to_restore_by_hand"]
+    library.release("email-polisher")
+    manifest = json.loads((paths.library_dir() / library.MANIFEST_NAME).read_text())
+    assert manifest["skills"] == {}
+
+
+def test_manifest_is_not_a_skill(native):
+    library.adopt("email-polisher")
+    assert {s["slug"] for s in discovery.scan()["skills"] if s["status"] == "adopted"} == {"email-polisher"}
