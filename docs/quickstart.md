@@ -7,7 +7,7 @@ Skills Wiki runs on your machine. It needs Python 3.11+ and at least one AI CLI 
 Install it so your AI agent can find the `skillswiki` command (a virtualenv is not on the agent's PATH):
 
 ```bash
-# needs pipx: brew install pipx   (or: python3 -m pip install --user pipx)
+# needs pipx: brew install pipx   (or: python3 -m pip install --user pipx), then once: pipx ensurepath
 pipx install git+https://github.com/appleaa123/skills_wiki_opensource.git
 ```
 

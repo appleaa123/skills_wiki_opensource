@@ -71,7 +71,7 @@ def test_release_all_cli(tmp_home, capsys):
     run(capsys, "adopt", "email-polisher")
     run(capsys, "adopt", "csv-cleaner")
     code, out, _ = run(capsys, "release", "--all")
-    assert code == 0 and "Released 2 skills" in out
+    assert code == 0 and "Released 2 skills back to their folders" in out
     code, out, _ = run(capsys, "release", "--all")
     assert code == 0 and "No adopted skills" in out
     code, _, err = run(capsys, "release")

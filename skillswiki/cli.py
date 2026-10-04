@@ -80,7 +80,8 @@ def cmd_release_all(args) -> None:
     result = library.release_all()
     if not result["released"] and not result["failed"]:
         return _print(result, args.json, "No adopted skills to release.")
-    lines = [f"Released {len(result['released'])} skills back to their folders."]
+    n = len(result["released"])
+    lines = [f"Released {n} skill{'s' if n != 1 else ''} back to {'their folders' if n != 1 else 'its folder'}."]
     lines += [f"  {r['slug']} -> {r['to']}" for r in result["released"]]
     lines += [f"  FAILED {f['slug']}: {f['error']}" for f in result["failed"]]
     _print(result, args.json, "\n".join(lines))

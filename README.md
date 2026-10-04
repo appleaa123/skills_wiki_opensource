@@ -20,7 +20,7 @@ Works with skills for **Claude Code, Codex and Antigravity** (folders containing
 ## Quickstart
 
 ```bash
-# needs pipx: brew install pipx   (or: python3 -m pip install --user pipx)
+# needs pipx: brew install pipx   (or: python3 -m pip install --user pipx), then once: pipx ensurepath
 pipx install git+https://github.com/appleaa123/skills_wiki_opensource.git
 skillswiki scan                    # find installed skills
 skillswiki adopt <slug>            # let Skills Wiki route and load it (reversible: skillswiki release <slug>)
