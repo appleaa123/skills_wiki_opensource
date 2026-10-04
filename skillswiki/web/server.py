@@ -25,6 +25,7 @@ DEFAULT_PORT = 7878
 TOKEN_HEADER = "X-Skillswiki-Token"
 TOKEN_PLACEHOLDER = "__SKILLSWIKI_TOKEN__"
 MAX_BODY_BYTES = 64 * 1024
+DRAIN_LIMIT_BYTES = 1024 * 1024  # read (and discard) an oversized body up to this, so the client gets the error
 _SKILL = re.compile(r"^/api/skills/(?P<slug>[^/]+)/(?P<action>[a-z]+)$")
 _LEARNING = re.compile(r"^/api/learnings/(?P<id>\d+)$")
 
@@ -87,6 +88,10 @@ class Handler(BaseHTTPRequestHandler):
     def _body(self) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
         if length < 0 or length > MAX_BODY_BYTES:
+            if 0 < length <= DRAIN_LIMIT_BYTES:
+                self.rfile.read(length)  # answering before the client finished sending resets the connection
+            else:
+                self.close_connection = True
             raise ValueError("request body too large")
         raw = self.rfile.read(length) if length else b"{}"
         data = json.loads(raw or b"{}")
