@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from skillswiki import paths
@@ -37,7 +38,7 @@ def test_scan_roots_user_project_and_extra(tmp_home):
 
 def test_scan_roots_dedupes(tmp_home, monkeypatch):
     extra = tmp_home / "userhome" / ".claude" / "skills"
-    monkeypatch.setenv("SKILLSWIKI_SCAN_ROOTS", f"{extra}:{extra}")
+    monkeypatch.setenv("SKILLSWIKI_SCAN_ROOTS", f"{extra}{os.pathsep}{extra}")
     roots = paths.scan_roots()
     assert roots.count(extra) == 1
 

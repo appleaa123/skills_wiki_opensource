@@ -11,7 +11,10 @@ from pathlib import Path
 
 from skillswiki import frontmatter, paths, store
 
-SCRIPT_SUFFIXES = frozenset({".py", ".sh", ".js", ".ts", ".rb", ".pl", ".ps1", ".bash", ".zsh"})
+SCRIPT_SUFFIXES = frozenset({".py", ".sh", ".js", ".ts", ".rb", ".pl", ".ps1", ".psm1", ".bash", ".zsh",
+                             ".bat", ".cmd", ".exe"})
+# Windows reports every existing file as executable, so the executable bit only counts on macOS/Linux.
+_POSIX = os.name != "nt"
 MAX_FILES_INSPECTED = 2000
 CHARS_PER_TOKEN = 4
 PLUGIN_MANIFEST = Path(".claude") / "plugins" / "installed_plugins.json"
@@ -32,7 +35,7 @@ def has_scripts(folder: Path) -> bool:
             break
         if not f.is_file() or f.name == frontmatter.SKILL_FILE:
             continue
-        if f.suffix.lower() in SCRIPT_SUFFIXES or os.access(f, os.X_OK):
+        if f.suffix.lower() in SCRIPT_SUFFIXES or (_POSIX and os.access(f, os.X_OK)):
             return True
     return False
 
@@ -50,7 +53,7 @@ def _plugin_skills() -> list[tuple[str, Path]]:
     internal file, so any parse problem means "no plugin skills", never an error."""
     manifest = Path.home() / PLUGIN_MANIFEST
     try:
-        plugins = json.loads(manifest.read_text()).get("plugins") or {}
+        plugins = json.loads(manifest.read_text(encoding="utf-8")).get("plugins") or {}
         found = []
         for key, installs in sorted(plugins.items()):
             plugin = key.split("@", 1)[0]

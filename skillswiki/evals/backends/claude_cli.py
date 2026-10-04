@@ -32,7 +32,7 @@ import json
 import subprocess
 import sys
 
-from . import Backend, BackendUnavailable
+from . import TEXT_IO, Backend, BackendUnavailable, executable
 
 # Patterns observed in a real exhausted-quota response body — checked in addition to
 # `is_error`/`subtype` in case a future CLI version reports quota exhaustion
@@ -56,7 +56,7 @@ def _reason(stdout: str) -> str:
 
 def _invoke(cmd: list[str], prompt: str, timeout: int) -> dict:
     try:
-        result = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(cmd, input=prompt, capture_output=True, timeout=timeout, **TEXT_IO)
     except Exception as exc:
         raise BackendUnavailable(f"claude -p failed to start: {exc}") from exc
 
@@ -91,7 +91,7 @@ def _invoke(cmd: list[str], prompt: str, timeout: int) -> dict:
 
 
 def _base_cmd(model: str | None, profile: dict | None) -> list[str]:
-    cmd = ["claude", "-p", "--output-format", "json"]
+    cmd = [executable("claude"), "-p", "--output-format", "json"]
     if profile:
         cmd += list(profile.get("flags") or [])
         system_prompt = profile.get("system_prompt")

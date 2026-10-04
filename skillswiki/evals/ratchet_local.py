@@ -93,7 +93,7 @@ def _row_to_accepted(row) -> dict:
 
 def record(result_path: Path | str, tier: str | None) -> int:
     """Insert one eval run (from runner._write_result's JSON) and log its tokens. Returns the eval id."""
-    result = json.loads(Path(result_path).read_text())
+    result = json.loads(Path(result_path).read_text(encoding="utf-8"))
     verdict = ((result.get("verdicts") or {}).get(COMPARISON) or {}).get("verdict")
     tokens = (result.get("token_usage") or {}).get("total") or 0
     with store.connect() as conn:

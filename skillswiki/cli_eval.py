@@ -16,7 +16,7 @@ DEFAULT_RUNS = 3
 
 
 def load_config() -> dict:
-    return json.loads((paths.package_dir() / "evals" / "config.json").read_text())
+    return json.loads((paths.package_dir() / "evals" / "config.json").read_text(encoding="utf-8"))
 
 
 def _arms_runs(args, config: dict) -> tuple[list[str], int]:

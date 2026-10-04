@@ -248,7 +248,17 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _safe_console() -> None:
+    """A console or pipe in a legacy encoding (common on Windows) must not crash on non-English skill text."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _safe_console()
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["hook"]:  # runs on every prompt: never print a traceback, always exit 0
         from skillswiki import hook

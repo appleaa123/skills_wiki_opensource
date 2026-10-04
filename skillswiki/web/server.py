@@ -10,6 +10,7 @@ Responses: {"ok": true, "data": ...} or {"ok": false, "error": "..."}. Guards: t
 server (DNS-rebinding), and every non-GET request needs the X-Skillswiki-Token generated at start (CSRF).
 """
 import json
+import os
 import re
 import secrets
 from http import HTTPStatus
@@ -123,7 +124,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get(self, path: str) -> None:
         if path in ("/", "/index.html"):
-            page = (paths.package_dir() / "web" / "static" / "index.html").read_text()
+            page = (paths.package_dir() / "web" / "static" / "index.html").read_text(encoding="utf-8")
             return self._send(HTTPStatus.OK, html=page.replace(TOKEN_PLACEHOLDER, self.token))
         if path in GET_ROUTES:
             return self._ok(GET_ROUTES[path]())
@@ -145,9 +146,15 @@ class Handler(BaseHTTPRequestHandler):
         self._dispatch("DELETE")
 
 
+class LocalServer(ThreadingHTTPServer):
+    # On Windows SO_REUSEADDR lets a second server bind a port that is already in use; never allow that there.
+    allow_reuse_address = os.name != "nt"
+    daemon_threads = True
+
+
 def make_server(port: int = DEFAULT_PORT) -> ThreadingHTTPServer:
     """A server on 127.0.0.1:<port> (0 = any free port) with a fresh write token."""
     handler = type("BoundHandler", (Handler,), {"token": secrets.token_urlsafe(24)})
-    server = ThreadingHTTPServer((HOST, port), handler)
+    server = LocalServer((HOST, port), handler)
     handler.port = server.server_address[1]
     return server

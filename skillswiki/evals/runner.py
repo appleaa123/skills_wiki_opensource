@@ -840,13 +840,13 @@ def _load_baseline(pack: str, key: str) -> dict | None:
     path = _baseline_path(pack, key)
     if not path.exists():
         return None
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _write_baseline(pack: str, key: str, records: list[dict], arm_result: dict) -> None:
     path = _baseline_path(pack, key)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"records": records, "arm_result": arm_result}, indent=2))
+    path.write_text(json.dumps({"records": records, "arm_result": arm_result}, indent=2), encoding="utf-8")
 
 
 def _judge_votes(config: dict) -> int:
@@ -1263,10 +1263,10 @@ def _write_result(result: dict, out_path: Path) -> Path:
     P1.4b step 2, 2026-09-09."""
     outputs = result.pop("outputs", [])
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(result, indent=2))
+    out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
     outputs_path = out_path.with_suffix(".outputs.jsonl")
-    outputs_path.write_text("".join(json.dumps(o) + "\n" for o in outputs))
+    outputs_path.write_text("".join(json.dumps(o) + "\n" for o in outputs), encoding="utf-8")
     return outputs_path
 
 

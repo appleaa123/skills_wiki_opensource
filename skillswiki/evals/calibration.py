@@ -45,7 +45,7 @@ _FLAT_LIST = re.compile(r"\[\s*([^\[\]{}]*?)\s*\]")
 def load(pack: str, directory: Path | None = None) -> dict:
     path = Path(directory or paths.calibration_dir()) / f"{pack}.json"
     if path.exists():
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     return {"pack": pack, "updated": None, "runs": [], "judges": {}, "rows": {}}
 
 
@@ -54,7 +54,7 @@ def save(store: dict, directory: Path | None = None) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{store['pack']}.json"
     text = json.dumps({**store, "updated": datetime.now(timezone.utc).isoformat()}, indent=1)
-    path.write_text(_FLAT_LIST.sub(lambda m: "[" + " ".join(m.group(1).split()) + "]", text) + "\n")
+    path.write_text(_FLAT_LIST.sub(lambda m: "[" + " ".join(m.group(1).split()) + "]", text) + "\n", encoding="utf-8")
     return path
 
 
@@ -63,7 +63,7 @@ def entry(store: dict, judge_key: str, criterion: str) -> dict | None:
 
 
 def cascade_config(path: Path | None = None) -> dict:
-    return json.loads(Path(path or paths.package_dir() / "evals" / "config.json").read_text())["cascade"]
+    return json.loads(Path(path or paths.package_dir() / "evals" / "config.json").read_text(encoding="utf-8"))["cascade"]
 
 
 # ── evidence ──────────────────────────────────────────────────────────
@@ -131,13 +131,13 @@ def _as_dicts(rows: list[list]) -> list[dict]:
 def paired_rows(result_path: Path) -> tuple[str, list[dict]]:
     """(judge_key, paired verdicts) from a cascade run: criteria the LLM decided that JEV also graded."""
     result_path = Path(result_path)
-    result = json.loads(result_path.read_text())
+    result = json.loads(result_path.read_text(encoding="utf-8"))
     judge = (result.get("cascade") or {}).get("judge_key")
     if not judge:
         raise SystemExit(f"{result_path} is not a cascade run (no cascade.judge_key)")
     rows = []
     outputs = result_path.with_suffix(".outputs.jsonl")
-    for line in outputs.read_text().splitlines():
+    for line in outputs.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         rec = json.loads(line)

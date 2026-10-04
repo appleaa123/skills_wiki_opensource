@@ -65,7 +65,7 @@ def catalog(slugs: list[str], skills: dict[str, dict]) -> dict:
 def _describe(skills: dict[str, dict]):
     def describe(slug: str) -> str:
         try:
-            return (Path(skills[slug]["path"]) / frontmatter.SKILL_FILE).read_text(errors="replace")[:DESCRIBE_CHARS]
+            return (Path(skills[slug]["path"]) / frontmatter.SKILL_FILE).read_text(encoding="utf-8", errors="replace")[:DESCRIBE_CHARS]
         except OSError:
             return ""
     return describe

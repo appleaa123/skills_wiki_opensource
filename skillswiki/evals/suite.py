@@ -24,7 +24,7 @@ def load_tasks(slug: str) -> list[dict]:
     path = suite_dir(slug) / "tasks.jsonl"
     if not path.exists():
         raise FileNotFoundError(f"no tasks.jsonl for {slug!r} (looked at {path}) — run: skillswiki eval generate {slug}")
-    tasks = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    tasks = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     if not tasks:
         raise ValueError(f"tasks.jsonl for {slug!r} is empty")
     return tasks
@@ -34,7 +34,7 @@ def load_rubric(slug: str) -> dict:
     path = suite_dir(slug) / "rubric.json"
     if not path.exists():
         raise FileNotFoundError(f"no rubric.json for {slug!r} (looked at {path})")
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def load_verifier(slug: str):
@@ -59,7 +59,7 @@ def skill_body(slug: str) -> str:
 
 def status(slug: str) -> dict:
     path = suite_dir(slug) / "suite.json"
-    return json.loads(path.read_text()) if path.exists() else {}
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
 def set_status(slug: str, value: str, **extra) -> dict:
@@ -68,15 +68,15 @@ def set_status(slug: str, value: str, **extra) -> dict:
     data = {**status(slug), **extra, "status": value, "updated_at": store.now()}
     folder = suite_dir(slug)
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / "suite.json").write_text(json.dumps(data, indent=2))
+    (folder / "suite.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
     return data
 
 
 def write(slug: str, tasks: list[dict], rubric: dict) -> Path:
     folder = suite_dir(slug)
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / "tasks.jsonl").write_text("".join(json.dumps(t) + "\n" for t in tasks))
-    (folder / "rubric.json").write_text(json.dumps(rubric, indent=2))
+    (folder / "tasks.jsonl").write_text("".join(json.dumps(t) + "\n" for t in tasks), encoding="utf-8")
+    (folder / "rubric.json").write_text(json.dumps(rubric, indent=2), encoding="utf-8")
     return folder
 
 

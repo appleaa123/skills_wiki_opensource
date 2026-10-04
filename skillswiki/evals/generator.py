@@ -28,7 +28,7 @@ RETRY_SUFFIX = "\n\nReturn only the JSON object."
 
 
 def _prompt(slug: str, skill_text: str) -> str:
-    template = (paths.package_dir() / "evals" / "prompts" / "generate_suite.md").read_text()
+    template = (paths.package_dir() / "evals" / "prompts" / "generate_suite.md").read_text(encoding="utf-8")
     return template.replace("<<SLUG>>", slug).replace("<<SKILL>>", skill_text[:SKILL_TEXT_MAX_CHARS])
 
 

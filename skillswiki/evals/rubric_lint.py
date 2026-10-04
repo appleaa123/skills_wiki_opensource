@@ -108,6 +108,6 @@ def _verify_info(path: Path) -> tuple[set | None, set]:
 
 def lint_suite(slug: str) -> list[Issue]:
     folder = suite.suite_dir(slug)
-    rubric = json.loads((folder / "rubric.json").read_text())
+    rubric = json.loads((folder / "rubric.json").read_text(encoding="utf-8"))
     verify_ids, strict_ids = _verify_info(folder / "verify.py")
     return lint_rubric(rubric, verify_ids, strict_ids)

@@ -22,6 +22,19 @@ ClaudeCli applies it: the flags are Claude-CLI-specific and do not carry
 over to codex/agy."""
 
 
+import shutil
+
+
+def executable(name: str) -> str:
+    """Full path of a CLI on PATH (on Windows this finds claude.cmd / agy.exe, which a bare name does not
+    start), or the name itself so the error message stays readable when it is missing."""
+    return shutil.which(name) or name
+
+
+# Text settings for every CLI subprocess: decode as UTF-8 on every OS (Windows defaults to a legacy code page).
+TEXT_IO = {"text": True, "encoding": "utf-8", "errors": "replace"}
+
+
 class BackendUnavailable(RuntimeError):
     """A backend call failed outright — non-zero exit, an error envelope, an
     empty response, or a detected quota/rate-limit message. Callers must let

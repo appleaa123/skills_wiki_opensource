@@ -43,8 +43,13 @@ def _row(slug: str) -> dict:
     return dict(row)
 
 
+def _is_link(path: Path) -> bool:
+    """A symlink, or a Windows directory junction (Python 3.12+ can tell; older versions see a plain folder)."""
+    return path.is_symlink() or bool(getattr(path, "is_junction", lambda: False)())
+
+
 def _exists(path: Path) -> bool:
-    return path.exists() or path.is_symlink()
+    return path.exists() or _is_link(path)
 
 
 def _copies_dir(slug: str) -> Path:
@@ -89,7 +94,7 @@ def adopt(slug: str) -> dict:
         raise ValueError(f"'{slug}' is no longer at {source} — run: skillswiki scan")
     if _exists(target):
         raise ValueError(f"{target} already exists; move or remove it first")
-    if source.is_symlink() and not os.path.isabs(os.readlink(source)):
+    if _is_link(source) and not os.path.isabs(os.readlink(source)):
         raise ValueError(f"{source} is a relative symlink; moving it would break it. Make the link absolute, or "
                          f"adopt the folder it points to ({source.resolve()})")
     digest = fingerprint(source)  # before any move: an unreadable file stops us with nothing moved
@@ -97,9 +102,9 @@ def adopt(slug: str) -> dict:
     others = _other_native_copies(slug, source)
     # A real folder that a symlinked copy (or the skill itself) points at stays put: moving it would leave the link
     # dangling while adopted. Moving the links themselves is safe.
-    link_targets = {p.resolve() for p in [source, *others] if p.is_symlink()}
+    link_targets = {p.resolve() for p in [source, *others] if _is_link(p)}
     for other in others:
-        if not other.is_symlink() and other.resolve() in link_targets:
+        if not _is_link(other) and other.resolve() in link_targets:
             linked.append(other)
             continue
         try:
@@ -180,7 +185,7 @@ def write_manifest() -> Path:
                 "skills": {r["slug"]: {"library_path": r["path"], "origin": r["origin_path"],
                                        "copies": json.loads(r["copies"] or "[]")} for r in rows}}
     path = paths.library_dir() / MANIFEST_NAME
-    path.write_text(json.dumps(manifest, indent=2) + "\n")
+    path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return path
 
 

@@ -61,7 +61,8 @@ def test_config_learning(tmp_home, capsys):
 
 def test_console_script_help():
     bin_dir = __import__("pathlib").Path(sys.executable).parent
-    result = subprocess.run([str(bin_dir / "skillswiki"), "--help"], capture_output=True, text=True)
+    script = bin_dir / ("skillswiki.exe" if sys.platform == "win32" else "skillswiki")
+    result = subprocess.run([str(script), "--help"], capture_output=True, text=True)
     assert result.returncode == 0 and "adopt" in result.stdout
 
 

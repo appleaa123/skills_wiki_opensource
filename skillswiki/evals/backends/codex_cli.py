@@ -13,14 +13,14 @@ interface parity but not applied: its flags are Claude-CLI-specific."""
 import subprocess
 import sys
 
-from . import Backend, BackendUnavailable
+from . import TEXT_IO, Backend, BackendUnavailable, executable
 
 _QUOTA_PATTERNS = ("session limit", "usage limit", "rate limit", "quota exceeded")
 
 
 def _invoke(cmd: list[str], prompt: str, timeout: int) -> dict:
     try:
-        result = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(cmd, input=prompt, capture_output=True, timeout=timeout, **TEXT_IO)
     except Exception as exc:
         raise BackendUnavailable(f"codex exec failed to start: {exc}") from exc
 
@@ -41,14 +41,14 @@ class CodexCli(Backend):
 
     def run(self, prompt: str, mcp_config: dict | None, model: str | None,
             timeout: int = 180, profile: dict | None = None) -> dict:
-        cmd = ["codex", "exec"]
+        cmd = [executable("codex"), "exec"]
         if model:
             cmd += ["--model", model]
         return _invoke(cmd, prompt, timeout)
 
     def judge(self, prompt: str, model: str | None, timeout: int = 60,
               profile: dict | None = None) -> dict:
-        cmd = ["codex", "exec"]
+        cmd = [executable("codex"), "exec"]
         if model:
             cmd += ["--model", model]
         return _invoke(cmd, prompt, timeout)

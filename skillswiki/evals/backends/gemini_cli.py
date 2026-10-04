@@ -22,7 +22,7 @@ import shutil
 import subprocess
 import sys
 
-from . import Backend, BackendUnavailable
+from . import TEXT_IO, Backend, BackendUnavailable, executable
 
 BIN_ENV = "SKILLSWIKI_GEMINI_BIN"
 _ANTIGRAVITY_BIN = "agy"
@@ -32,7 +32,7 @@ _QUOTA_PATTERNS = ("session limit", "usage limit", "rate limit", "quota exceeded
 
 def _invoke(cmd: list[str], timeout: int) -> dict:
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(cmd, capture_output=True, timeout=timeout, **TEXT_IO)
     except Exception as exc:
         raise BackendUnavailable(f"{binary()} -p failed to start: {exc}") from exc
 
@@ -56,10 +56,16 @@ def binary() -> str:
     return _ANTIGRAVITY_BIN if shutil.which(_ANTIGRAVITY_BIN) else _GEMINI_CLI_BIN
 
 
+def _program_name(path: str) -> str:
+    """'agy' for agy, agy.exe, /usr/local/bin/agy or C:\\tools\\agy.exe (either separator, any OS)."""
+    name = path.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    return name.rsplit(".", 1)[0] if name.endswith((".exe", ".cmd", ".bat")) else name
+
+
 def _cmd(prompt: str, model: str | None) -> list[str]:
     bin_ = binary()
-    cmd = [bin_, "-p", prompt]
-    if os.path.basename(bin_) == _ANTIGRAVITY_BIN:
+    cmd = [executable(bin_), "-p", prompt]
+    if _program_name(bin_) == _ANTIGRAVITY_BIN:
         cmd.append("--disable-slash-commands")
     if model:
         cmd += ["--model", model]

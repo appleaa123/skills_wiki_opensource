@@ -96,7 +96,7 @@ def jev_flags(tasks: list[dict], rubric: dict, skill_text: str) -> tuple[list[di
             continue
         if (answer.noul > JEV_FLAG_AT) if flag_high else (answer.noul < JEV_FLAG_AT):
             issues.append(_issue("warn", where, f"{label}: P={answer.noul:.2f} {ADVISORY}"))
-    config = json.loads((paths.package_dir() / "evals" / "config.json").read_text())
+    config = json.loads((paths.package_dir() / "evals" / "config.json").read_text(encoding="utf-8"))
     usd = result.input_tokens * config["cascade"]["usd_per_million_jev_tokens"] / 1_000_000
     return issues, {"input_tokens": result.input_tokens, "usd": round(usd, 6)}
 

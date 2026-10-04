@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from conftest import needs_symlinks, posix_permissions
 from helpers import install_fixture_skills
 
 from skillswiki import discovery, library, paths, store
@@ -108,6 +109,7 @@ def test_release_refuses_native(native):
         library.release("email-polisher")
 
 
+@needs_symlinks
 def test_symlinked_skill_round_trip(tmp_home):
     real = install_fixture_skills(tmp_home / "elsewhere", ["meeting-notes"]) / "meeting-notes"
     link = tmp_home / "native" / "meeting-notes"
@@ -148,6 +150,7 @@ def test_adopt_rolls_back_when_db_update_fails(native, monkeypatch):
     assert _row("email-polisher")["status"] == "native"
 
 
+@posix_permissions
 def test_adopt_survives_unreadable_skill_elsewhere(native, tmp_home):
     bad = install_fixture_skills(tmp_home / "userhome" / ".agents" / "skills", ["meeting-notes"]) / "meeting-notes"
     (bad / "SKILL.md").chmod(0)
@@ -239,6 +242,7 @@ def test_failed_adopt_can_be_retried(tmp_home, monkeypatch):
     assert library.adopt("email-polisher")["moved_copies"]  # retry works
 
 
+@needs_symlinks
 def test_symlinked_primary_never_strands_its_target(tmp_home):
     real = install_fixture_skills(tmp_home / "userhome" / ".agents" / "skills", ["email-polisher"]) / "email-polisher"
     link_root = tmp_home / "userhome" / ".claude" / "skills"
@@ -270,6 +274,7 @@ def test_release_skips_a_missing_stored_copy(tmp_home):
     assert claude.is_dir() and not agents.exists() and result["missing_copies"] == [str(agents)]
 
 
+@needs_symlinks
 def test_relative_symlink_primary_is_refused(tmp_home):
     real = install_fixture_skills(tmp_home / "elsewhere", ["meeting-notes"]) / "meeting-notes"
     link = tmp_home / "native" / "meeting-notes"

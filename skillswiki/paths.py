@@ -55,12 +55,13 @@ def package_dir() -> Path:
 
 
 def scan_roots() -> list[Path]:
-    """Native skill roots, user-level then project-level then SKILLSWIKI_SCAN_ROOTS extras. Missing
+    """Native skill roots, user-level then project-level then SKILLSWIKI_SCAN_ROOTS extras (separated by ':' on
+    macOS/Linux, ';' on Windows — os.pathsep). Missing
     directories are kept (callers skip them); duplicates (by resolved path) are dropped."""
     candidates = [Path.home() / d for d in AGENT_SKILL_DIRS]
     candidates += [Path.cwd() / d for d in AGENT_SKILL_DIRS]
     extra = os.getenv(SCAN_ROOTS_ENV, "")
-    candidates += [Path(p).expanduser().absolute() for p in extra.split(":") if p.strip()]
+    candidates += [Path(p).expanduser().absolute() for p in extra.split(os.pathsep) if p.strip()]
     roots, seen = [], set()
     for path in candidates:
         key = path.resolve()
@@ -76,7 +77,7 @@ def load_env() -> None:
     env_file = home() / ENV_FILE_NAME
     if not env_file.is_file():
         return
-    for line in env_file.read_text().splitlines():
+    for line in env_file.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue

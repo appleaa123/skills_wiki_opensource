@@ -1,3 +1,5 @@
+import os
+from conftest import posix_permissions
 import json
 import shutil
 
@@ -73,6 +75,7 @@ def test_sync_db_upserts_and_removes(tmp_home):
     assert "meeting-notes" not in _rows()
 
 
+@posix_permissions
 def test_scan_skips_unreadable_skill(tmp_home):
     native = install_fixture_skills(tmp_home / "native")
     (native / "meeting-notes" / "SKILL.md").chmod(0)
@@ -81,3 +84,13 @@ def test_scan_skips_unreadable_skill(tmp_home):
         assert slugs == {"email-polisher", "csv-cleaner"}
     finally:
         (native / "meeting-notes" / "SKILL.md").chmod(0o644)
+
+
+def test_windows_ignores_the_executable_bit(tmp_home, monkeypatch):
+    native = install_fixture_skills(tmp_home / "native", ["email-polisher"])
+    (native / "email-polisher" / "notes.txt").write_text("plain")
+    os.chmod(native / "email-polisher" / "notes.txt", 0o755)
+    monkeypatch.setattr(discovery, "_POSIX", False)
+    assert discovery.has_scripts(native / "email-polisher") is False
+    (native / "email-polisher" / "setup.bat").write_text("@echo off")
+    assert discovery.has_scripts(native / "email-polisher") is True
