@@ -119,7 +119,7 @@ def test_symlinked_skill_round_trip(tmp_home):
     target = paths.library_dir() / "meeting-notes"
     assert target.is_symlink() and not link.exists() and real.is_dir()
     library.release("meeting-notes")
-    assert link.is_symlink() and os.readlink(link) == str(real)
+    assert link.is_symlink() and link.resolve() == real.resolve()  # Windows reports targets as \\?\C:\...
 
 
 def test_adopt_moves_identical_other_copy(tmp_home):

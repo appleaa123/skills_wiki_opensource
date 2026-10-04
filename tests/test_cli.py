@@ -1,5 +1,6 @@
 import json
 import subprocess
+from pathlib import Path
 import sys
 
 from helpers import install_fixture_skills
@@ -60,8 +61,9 @@ def test_config_learning(tmp_home, capsys):
 
 
 def test_console_script_help():
-    bin_dir = __import__("pathlib").Path(sys.executable).parent
-    script = bin_dir / ("skillswiki.exe" if sys.platform == "win32" else "skillswiki")
+    import sysconfig
+    # console scripts live in the interpreter's scripts dir (bin/ in a venv, Scripts\ on Windows)
+    script = Path(sysconfig.get_path("scripts")) / ("skillswiki.exe" if sys.platform == "win32" else "skillswiki")
     result = subprocess.run([str(script), "--help"], capture_output=True, text=True)
     assert result.returncode == 0 and "adopt" in result.stdout
 

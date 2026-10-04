@@ -10,7 +10,7 @@ def test_executable_resolves_from_path(tmp_path, monkeypatch):
     tool.write_text("@echo off" if os.name == "nt" else "#!/bin/sh\n")
     tool.chmod(0o755)
     monkeypatch.setenv("PATH", str(tmp_path))
-    assert executable("claude") == str(tool)
+    assert os.path.normcase(executable("claude")) == os.path.normcase(str(tool))  # Windows may say claude.CMD
     assert executable("not-installed-anywhere") == "not-installed-anywhere"
 
 
