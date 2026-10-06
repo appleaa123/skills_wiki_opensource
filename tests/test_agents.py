@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from conftest import posix_permissions
 from helpers import install_fixture_skills
 
 from skillswiki import agents, errors, paths
@@ -66,3 +67,15 @@ def test_project_dirs_prefer_codex_current_folder():
     dirs = agents.PROJECT_SKILL_DIRS
     assert dirs.index(".agents/skills") < dirs.index(".codex/skills")
 
+
+def test_project_level_roots_name_their_agents(tmp_home):
+    work = tmp_home / "work"
+    for d in agents.PROJECT_SKILL_DIRS:
+        (work / d).mkdir(parents=True)
+    assert agents.keys_for(work / ".claude" / "skills") == ["claude_code"]
+    assert agents.keys_for(work / ".codex" / "skills") == ["codex"]
+    assert agents.keys_for(work / ".gemini" / "skills") == ["gemini_cli"]
+    assert agents.keys_for(work / ".agent" / "skills") == ["antigravity"]
+    assert agents.keys_for(work / ".agents" / "skills") == ["codex", "gemini_cli", "antigravity", "github_copilot",
+                                                             "cline", "warp"]
+    assert agents.keys_for(tmp_home / "native") == []  # an extra from SKILLSWIKI_SCAN_ROOTS stays unowned
