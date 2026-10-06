@@ -63,11 +63,6 @@ def test_scan_roots_come_from_the_registry(tmp_home):
     assert roots.index(userhome / ".hermes" / "skills") < roots.index(work / ".claude" / "skills")
 
 
-def test_project_dirs_prefer_codex_current_folder():
-    dirs = agents.PROJECT_SKILL_DIRS
-    assert dirs.index(".agents/skills") < dirs.index(".codex/skills")
-
-
 def test_project_level_roots_name_their_agents(tmp_home):
     work = tmp_home / "work"
     for d in agents.PROJECT_SKILL_DIRS:
@@ -79,3 +74,18 @@ def test_project_level_roots_name_their_agents(tmp_home):
     assert agents.keys_for(work / ".agents" / "skills") == ["codex", "gemini_cli", "antigravity", "github_copilot",
                                                              "cline", "warp"]
     assert agents.keys_for(tmp_home / "native") == []  # an extra from SKILLSWIKI_SCAN_ROOTS stays unowned
+
+
+@posix_permissions
+def test_skill_count_survives_an_unreadable_folder(tmp_home):
+    folder = install_fixture_skills(tmp_home / "userhome" / ".cursor" / "skills", ["email-polisher"])
+    folder.chmod(0)
+    try:
+        assert agents.skill_count(agents.by_key("cursor")) == 0
+    finally:
+        folder.chmod(0o755)
+
+
+def test_project_dirs_prefer_codex_current_folder():
+    dirs = agents.PROJECT_SKILL_DIRS
+    assert dirs.index(".agents/skills") < dirs.index(".codex/skills")

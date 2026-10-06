@@ -74,9 +74,10 @@ def detected(agent: Agent) -> bool:
 
 
 def _count(folder: Path) -> int:
-    if not folder.is_dir():
+    try:
+        return sum(1 for c in folder.iterdir() if c.is_dir() and (c / frontmatter.SKILL_FILE).is_file())
+    except OSError:  # absent, or not readable by this user: nothing Skills Wiki can count
         return 0
-    return sum(1 for c in folder.iterdir() if c.is_dir() and (c / frontmatter.SKILL_FILE).is_file())
 
 
 def skill_count(agent: Agent) -> int:
