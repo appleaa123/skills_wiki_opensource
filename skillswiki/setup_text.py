@@ -131,3 +131,48 @@ def summary(outcomes: list[dict], zip_path: Path | None) -> str:
 
 def stopped(reason: str) -> str:
     return f"{reason} Stopped here; everything done so far is listed above. Run the command again to continue."
+
+
+UNINSTALL_INTRO = ("Uninstalling Skills Wiki. I will:\n"
+                   "  1. save your current learnings as Markdown files,\n"
+                   "  2. put every skill back in its original folder,\n"
+                   "  3. remove the hooks, rules and server entries setup added (backing up each file first),\n"
+                   "  4. ask whether to keep the backups.\n"
+                   "Then you remove the program itself with pipx.")
+ASK_UNINSTALL = "Go ahead? [y/n]"
+ASK_DELETE_BACKUPS = "Delete the backups now? [y/n]"
+DRY_RUN_END_UNINSTALL = "Dry run: nothing was changed. Run `skillswiki uninstall` to do it."
+RELEASE_BLOCKED = ("Some skills could not go back (see above), so I stopped before disconnecting your agents: they can "
+                   "still reach the skills that are left. Fix each problem, then run `skillswiki uninstall` again.")
+
+
+def uninstall_plan(preview: dict, rows: list[dict]) -> str:
+    lines = [f"{_plural(len(preview['released']), 'skill')} go back:"]
+    lines += [f"  {r['slug']} -> {r['to']}" for r in preview["released"]]
+    lines += [f"  can't go back: {f['slug']}: {f['error']}" for f in preview["failed"]]
+    lines.append(f"{_plural(len(rows), 'agent')} get disconnected: " + (", ".join(r["agent"] for r in rows) or "none"))
+    return "\n".join(lines)
+
+
+def exported(files: list[str]) -> str:
+    return ("Saved your learnings:\n" + "\n".join(f"  {f}" for f in files)) if files else "No learnings to save."
+
+
+def released(result: dict) -> str:
+    lines = [f"Put back {_plural(len(result['released']), 'skill')}."]
+    lines += [f"  FAILED {f['slug']}: {f['error']}" for f in result["failed"]]
+    return "\n".join(lines)
+
+
+def disconnected(removed: list[dict]) -> str:
+    return "Disconnected: " + (", ".join(r["agent"] for r in removed) or "no agents")
+
+
+def backup_warning() -> str:
+    return (f"Backups of your skills and settings are in {paths.home() / 'backups'}. Deleting {paths.home()} later "
+            "also deletes them, and your learnings.")
+
+
+def uninstall_final() -> str:
+    return (f"Done. Finish with:\n  pipx uninstall skillswiki\nYour learnings stay in {paths.db_path()} and as Markdown "
+            f"in {paths.home() / 'learnings'}; any agent can read those files.")
