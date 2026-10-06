@@ -10,7 +10,7 @@ import os
 import shutil
 from pathlib import Path
 
-from skillswiki import discovery, paths, store
+from skillswiki import backup, discovery, paths, store
 from skillswiki.errors import SkillsWikiError
 
 FINGERPRINT_CHARS = 16
@@ -271,3 +271,29 @@ def changed(slug: str) -> bool:
     if row["status"] != "adopted" or not row["fingerprint"]:
         return False
     return fingerprint(Path(row["path"])) != row["fingerprint"]
+
+
+def _back_up(zip_path: Path, plan: dict) -> None:
+    for folder in [plan["from"], *plan["moved_copies"]]:
+        backup.add_skill(zip_path, Path(folder))
+
+
+def adopt_all(dry_run: bool = False, zip_path: Path | None = None) -> dict:
+    """Adopt every native skill (or, with dry_run, only plan it). Keeps going past a failure and reports it.
+    With zip_path, each folder is added to that backup before it moves."""
+    with store.connect() as conn:
+        slugs = [r["slug"] for r in conn.execute("SELECT slug FROM skills WHERE status = 'native' ORDER BY slug")]
+    adopted, failed = [], []
+    for slug in slugs:
+        if slug == paths.SHIPPED_SKILL_SLUG:
+            continue
+        try:
+            plan = plan_adopt(slug)
+            if not dry_run:
+                if zip_path:
+                    _back_up(zip_path, plan)
+                plan = adopt(slug)
+            adopted.append(plan)
+        except (ValueError, OSError) as exc:
+            failed.append({"slug": slug, "code": getattr(exc, "code", "INVALID_INPUT"), "error": str(exc)})
+    return {"adopted": adopted, "failed": failed}

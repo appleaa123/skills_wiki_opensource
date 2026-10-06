@@ -431,3 +431,27 @@ def test_shipped_skill_cannot_be_adopted(tmp_home):
     with pytest.raises(ValueError, match="hide it from your agent") as info:
         library.plan_adopt("skills-wiki")
     assert info.value.code == "RESERVED"
+
+
+def test_adopt_all_dry_run_moves_nothing_then_adopts_everything(tmp_home):
+    import zipfile
+
+    from skillswiki import backup
+    native = install_fixture_skills(tmp_home / "native")
+    discovery.sync_db()
+    preview = library.adopt_all(dry_run=True)
+    assert [p["slug"] for p in preview["adopted"]] == ["csv-cleaner", "email-polisher", "meeting-notes"]
+    assert (native / "csv-cleaner").is_dir()
+    zip_path = backup.start()
+    result = library.adopt_all(zip_path=zip_path)
+    assert len(result["adopted"]) == 3 and result["failed"] == [] and not (native / "csv-cleaner").exists()
+    assert any(n.endswith("csv-cleaner/SKILL.md") for n in zipfile.ZipFile(zip_path).namelist())
+
+
+def test_adopt_all_keeps_going_past_a_failure(tmp_home):
+    install_fixture_skills(tmp_home / "native")
+    discovery.sync_db()
+    (paths.library_dir() / "email-polisher").mkdir(parents=True)
+    result = library.adopt_all()
+    assert [f["slug"] for f in result["failed"]] == ["email-polisher"]
+    assert result["failed"][0]["code"] == "TARGET_EXISTS" and len(result["adopted"]) == 2

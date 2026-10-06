@@ -74,8 +74,31 @@ def cmd_agents(args) -> None:
 
 
 def cmd_adopt(args) -> None:
+    if args.all:
+        return cmd_adopt_all(args)
+    if not args.slug:
+        raise ValueError("give a skill slug or --all")
     result = library.plan_adopt(args.slug) if args.dry_run else library.adopt(args.slug)
     _print(result, args.json, _adopt_lines(result, args.dry_run))
+
+
+def cmd_adopt_all(args) -> None:
+    from skillswiki import backup
+    discovery.sync_db()
+    preview = library.adopt_all(dry_run=True)
+    zip_path = backup.start("adopt") if preview["adopted"] and not args.dry_run else None
+    result = preview if args.dry_run else library.adopt_all(zip_path=zip_path)
+    n = len(result["adopted"])
+    if not n and not result["failed"]:
+        return _print(result, args.json, "No new skills to adopt.")
+    verb = "Would adopt" if args.dry_run else "Adopted"
+    lines = [f"{verb} {n} skill{'s' if n != 1 else ''}."]
+    lines += [f"  {p['slug']}: {p['from']} -> {p['to']}" for p in result["adopted"]]
+    lines += [f"  FAILED {f['slug']}: {f['error']}" for f in result["failed"]]
+    lines += [f"Backup: {zip_path}"] if zip_path else []
+    _print({**result, "backup": str(zip_path) if zip_path else None}, args.json, "\n".join(lines))
+    if result["failed"]:
+        raise ValueError(f"{len(result['failed'])} skill(s) could not be adopted; see above")
 
 
 def _release_lines(result: dict, dry_run: bool) -> str:
@@ -240,8 +263,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--status", choices=["adopted", "native", "plugin"])
     p.set_defaults(func=cmd_list)
     sub.add_parser("agents", help="list the agents whose skill folders are scanned").set_defaults(func=cmd_agents)
-    p = sub.add_parser("adopt", help="move a skill into the Skills Wiki library")
-    p.add_argument("slug")
+    p = sub.add_parser("adopt", help="move a skill into the Skills Wiki library (--all: every new skill)")
+    p.add_argument("slug", nargs="?")
+    p.add_argument("--all", action="store_true", help="adopt every skill not adopted yet (scans first)")
     p.add_argument("--dry-run", dest="dry_run", action="store_true", help="show what would move; move nothing")
     p.set_defaults(func=cmd_adopt)
     p = sub.add_parser("load", help="print an adopted skill with its learnings")

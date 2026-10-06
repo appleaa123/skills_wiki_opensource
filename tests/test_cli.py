@@ -177,3 +177,15 @@ def test_learn_export(tmp_home, capsys):
     assert code == 0 and "No current learnings for csv-cleaner" in out
     code, _, err = run(capsys, "learn", "add")
     assert code == 1 and "give a skill slug" in err
+
+
+def test_adopt_all_cli(tmp_home, capsys):
+    install_fixture_skills(tmp_home / "native")
+    code, out, _ = run(capsys, "adopt", "--all", "--dry-run")
+    assert code == 0 and "Would adopt 3 skills" in out
+    code, out, _ = run(capsys, "adopt", "--all")
+    assert code == 0 and "Adopted 3 skills" in out and "Backup:" in out
+    code, out, _ = run(capsys, "adopt", "--all")
+    assert code == 0 and "No new skills to adopt." in out
+    code, _, err = run(capsys, "adopt")
+    assert code == 1 and "give a skill slug or --all" in err
