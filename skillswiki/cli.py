@@ -5,6 +5,8 @@ Expected failures (ValueError) print one line to stderr and exit 1. Anything els
 import argparse
 import json
 import sys
+import zipfile
+from pathlib import Path
 
 from skillswiki import agents, cards, discovery, errors, learnings, library, loader, paths, store
 from skillswiki.route import suggest
@@ -179,8 +181,15 @@ def cmd_config(args) -> None:
 
 def cmd_doctor(args) -> None:
     from skillswiki import doctor
-    rep = doctor.report()
-    _print(rep, args.json, doctor.human(rep))
+    if not args.export:
+        rep = doctor.report()
+        return _print(rep, args.json, doctor.human(rep))
+    path = doctor.export(Path.cwd())
+    with zipfile.ZipFile(path) as zf:
+        names = sorted(zf.namelist())
+    _print({"path": str(path), "files": names}, args.json,
+           f"Wrote {path}\n  contains: {', '.join(names)}\nAttach it to your bug report; it holds no key values, "
+           "prompts, learnings or skill files.")
 
 
 def cmd_serve_mcp(args) -> None:
@@ -275,6 +284,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_ui)
 
     p = sub.add_parser("doctor", help="show what is installed and configured (for bug reports)")
+    p.add_argument("--export", action="store_true", help="write a zip for a bug report into the current folder")
     p.set_defaults(func=cmd_doctor)
 
     sub.add_parser("serve-mcp", help="run the MCP server over stdio").set_defaults(func=cmd_serve_mcp)

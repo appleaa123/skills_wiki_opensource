@@ -158,3 +158,9 @@ def test_doctor_command(tmp_home, capsys):
     assert code == 0 and "version" in out and "database" in out
     code, out, _ = run(capsys, "--json", "doctor")
     assert code == 0 and json.loads(out)["db"]["present"] is False
+
+
+def test_doctor_export_command(tmp_home, capsys):
+    code, out, _ = run(capsys, "doctor", "--export")
+    assert code == 0 and "skillswiki-doctor-" in out and "report.json" in out
+    assert any(p.name.startswith("skillswiki-doctor-") for p in (tmp_home / "work").iterdir())

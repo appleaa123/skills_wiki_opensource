@@ -9,4 +9,4 @@ about: Something does not work
 
 **Steps to reproduce**
 
-**Environment**: OS, Python version, `skillswiki --help` works?, agent (Claude Code / Codex / Gemini CLI), TypeSafe key set (yes/no — never paste the key)
+**Environment**: run `skillswiki doctor --export` and attach the zip (it contains no key values, prompts or skill files). If that fails, say which agent (Claude Code / Codex / Gemini CLI / Antigravity) and your OS and Python version. Never paste your TypeSafe key.

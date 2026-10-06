@@ -4,15 +4,18 @@ import json
 import os
 import platform
 import shutil
+import zipfile
+from datetime import datetime
 from pathlib import Path
 
 import skillswiki
-from skillswiki import agents, library, paths, store
+from skillswiki import agents, library, paths, store, usage
 from skillswiki.decision import jev_enabled
 
 CLIS = ("claude", "codex", "gemini", "agy")
 HOOK_MARK = "skillswiki hook"
 MCP_MARK = "skillswiki"
+EXPORT_PREFIX = "skillswiki-doctor-"
 
 
 def _tables() -> dict:
@@ -101,3 +104,34 @@ def human(rep: dict) -> str:
              f"TypeSafe key set: {'yes' if rep['typesafe_key_set'] else 'no'}  JEV: {rep['jev']}",
              "Claude Code: " + "  ".join(f"{k} {v}" for k, v in rep["claude_code"].items())]
     return "\n".join(lines)
+
+
+def _env_keys(env_file: Path) -> list[str]:
+    """Names of the keys set in ~/.skillswiki/.env, never their values."""
+    if not env_file.is_file():
+        return []
+    keys = []
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            keys.append(line.split("=", 1)[0].strip())
+    return sorted(keys)
+
+
+def export(out_dir: Path) -> Path:
+    """Zip the report and the non-secret state (no prompts, no learnings, no skill files) for a bug report."""
+    rep = report()
+    files: dict[str, object] = {"report.json": rep, "env_keys.json": _env_keys(paths.home() / paths.ENV_FILE_NAME)}
+    if rep["db"]["present"]:
+        with store.connect() as conn:
+            files["skills.json"] = [dict(r) for r in conn.execute("SELECT * FROM skills ORDER BY slug")]
+            files["settings.json"] = {r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM settings")}
+        files["usage_summary.json"] = usage.counts("")  # every event; counts only, no text
+    path = Path(out_dir) / f"{EXPORT_PREFIX}{datetime.now().strftime('%Y%m%d-%H%M')}.zip"
+    manifest = paths.library_dir() / library.MANIFEST_NAME
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in files.items():
+            zf.writestr(name, json.dumps(data, indent=2, default=str))
+        if manifest.is_file():
+            zf.write(manifest, library.MANIFEST_NAME)
+    return path

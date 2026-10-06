@@ -47,3 +47,33 @@ def test_doctor_reads_claude_code_config(tmp_home, monkeypatch):
     assert rep["typesafe_key_set"] is True
     assert rep["claude_code"] == {"hook_user": "yes", "hook_project": "no", "mcp_user": "yes",
                                   "mcp_project": "unreadable"}
+
+
+def test_export_without_a_database(tmp_home):
+    import zipfile
+    path = doctor.export(Path.cwd())
+    assert path.name.startswith("skillswiki-doctor-") and path.suffix == ".zip"
+    with zipfile.ZipFile(path) as zf:
+        assert sorted(zf.namelist()) == ["env_keys.json", "report.json"]
+        assert json.loads(zf.read("report.json"))["db"]["present"] is False
+
+
+def test_export_contents_and_no_secret(tmp_home, monkeypatch):
+    import zipfile
+
+    from skillswiki import usage
+    install_fixture_skills(tmp_home / "native")
+    discovery.sync_db()
+    library.adopt("email-polisher")
+    secret = "sk-very-secret-value"
+    monkeypatch.setenv("TYPESAFE_API_KEY", secret)
+    (paths.home() / ".env").write_text(f"TYPESAFE_API_KEY={secret}\nSKILLSWIKI_JEV=off\n", encoding="utf-8")
+    usage.log("email-polisher", "load")
+    path = doctor.export(Path.cwd())
+    with zipfile.ZipFile(path) as zf:
+        assert sorted(zf.namelist()) == ["RESTORE.json", "env_keys.json", "report.json", "settings.json",
+                                         "skills.json", "usage_summary.json"]
+        assert json.loads(zf.read("env_keys.json")) == ["SKILLSWIKI_JEV", "TYPESAFE_API_KEY"]
+        assert json.loads(zf.read("usage_summary.json")) == {"email-polisher": {"load": 1}}
+        assert json.loads(zf.read("skills.json"))[0]["slug"] == "csv-cleaner"
+        assert all(secret.encode() not in zf.read(name) for name in zf.namelist())
