@@ -14,7 +14,8 @@ def test_doctor_without_a_database(tmp_home):
     assert not paths.db_path().exists()  # reporting must not create it
     assert rep["typesafe_key_set"] is False and rep["jev"] == "off"
     assert set(rep["clis"]) == {"claude", "codex", "gemini", "agy"}
-    assert rep["claude_code"] == {"hook_user": "no", "hook_project": "no", "mcp_user": "no", "mcp_project": "no"}
+    assert rep["claude_code"] == {"hook_user": "no", "hook_project": "no", "mcp_user": "no", "mcp_local": "no",
+                                  "mcp_project": "no"}
 
 
 def test_doctor_with_adopted_and_missing(tmp_home):
@@ -45,7 +46,7 @@ def test_doctor_reads_claude_code_config(tmp_home, monkeypatch):
     (Path.cwd() / ".mcp.json").write_text("{not json", encoding="utf-8")
     rep = doctor.report()
     assert rep["typesafe_key_set"] is True
-    assert rep["claude_code"] == {"hook_user": "yes", "hook_project": "no", "mcp_user": "yes",
+    assert rep["claude_code"] == {"hook_user": "yes", "hook_project": "no", "mcp_user": "yes", "mcp_local": "no",
                                   "mcp_project": "unreadable"}
 
 
@@ -77,3 +78,25 @@ def test_export_contents_and_no_secret(tmp_home, monkeypatch):
         assert json.loads(zf.read("usage_summary.json")) == {"email-polisher": {"load": 1}}
         assert json.loads(zf.read("skills.json"))[0]["slug"] == "csv-cleaner"
         assert all(secret.encode() not in zf.read(name) for name in zf.namelist())
+
+
+def test_doctor_sees_local_scope_mcp(tmp_home):
+    # `claude mcp add` without --scope writes to ~/.claude.json -> projects[<cwd>].mcpServers (local scope)
+    (Path.home() / ".claude.json").write_text(json.dumps(
+        {"projects": {str(Path.cwd()): {"mcpServers": {"skills-wiki": {"command": "skillswiki",
+                                                                        "args": ["serve-mcp"]}}}}}),
+        encoding="utf-8")
+    assert doctor.report()["claude_code"]["mcp_local"] == "yes"
+
+
+def test_doctor_survives_unexpected_json_shapes(tmp_home):
+    home = Path.home()
+    (home / ".claude").mkdir()
+    for settings, config in ((["x"], [None]),
+                             ({"hooks": {"UserPromptSubmit": ["skillswiki hook"]}}, {"mcpServers": {"a": None}}),
+                             ({"hooks": {"UserPromptSubmit": [{"hooks": ["x"]}]}}, {"mcpServers": {"a": "x"}}),
+                             ({"hooks": None}, {"projects": {str(Path.cwd()): None}})):
+        (home / ".claude" / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
+        (home / ".claude.json").write_text(json.dumps(config), encoding="utf-8")
+        status = doctor.report()["claude_code"]
+        assert set(status.values()) <= {"yes", "no", "unreadable"}

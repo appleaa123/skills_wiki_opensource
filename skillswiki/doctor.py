@@ -44,32 +44,44 @@ def _json_file(path: Path):
 def _hook_registered(settings) -> str:
     if settings is None:
         return "no"
-    if settings == "unreadable" or not isinstance(settings, dict):
+    try:
+        for group in (settings.get("hooks") or {}).get("UserPromptSubmit") or []:
+            for hook in group.get("hooks") or []:
+                if HOOK_MARK in str(hook.get("command", "")):
+                    return "yes"
+    except (AttributeError, TypeError):  # "unreadable", or valid JSON of a shape we don't know
         return "unreadable"
-    for group in (settings.get("hooks") or {}).get("UserPromptSubmit") or []:
-        for hook in group.get("hooks") or []:
-            if HOOK_MARK in str(hook.get("command", "")):
-                return "yes"
     return "no"
 
 
 def _mcp_registered(config) -> str:
     if config is None:
         return "no"
-    if config == "unreadable" or not isinstance(config, dict):
+    try:
+        for server in (config.get("mcpServers") or {}).values():
+            text = " ".join([str(server.get("command", "")), *(str(a) for a in server.get("args") or [])])
+            if MCP_MARK in text:
+                return "yes"
+    except (AttributeError, TypeError):  # "unreadable", or valid JSON of a shape we don't know
         return "unreadable"
-    for server in (config.get("mcpServers") or {}).values():
-        text = " ".join([str(server.get("command", "")), *(str(a) for a in server.get("args") or [])])
-        if MCP_MARK in text:
-            return "yes"
     return "no"
+
+
+def _local_scope(config, cwd: Path):
+    """`claude mcp add` without --scope stores the server under projects[<cwd>] in ~/.claude.json (local scope)."""
+    try:
+        return config.get("projects", {}).get(str(cwd)) if isinstance(config, dict) else config
+    except AttributeError:
+        return "unreadable"
 
 
 def claude_code_status() -> dict:
     home, cwd = Path.home(), Path.cwd()
+    claude_json = _json_file(home / ".claude.json")
     return {"hook_user": _hook_registered(_json_file(home / ".claude" / "settings.json")),
             "hook_project": _hook_registered(_json_file(cwd / ".claude" / "settings.json")),
-            "mcp_user": _mcp_registered(_json_file(home / ".claude.json")),
+            "mcp_user": _mcp_registered(claude_json),
+            "mcp_local": _mcp_registered(_local_scope(claude_json, cwd)),
             "mcp_project": _mcp_registered(_json_file(cwd / ".mcp.json"))}
 
 

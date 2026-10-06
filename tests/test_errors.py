@@ -56,3 +56,14 @@ def test_codes_on_learnings(tmp_home):
     assert _code(learnings.require_adopted, "meeting-notes")[0] == "NOT_ADOPTED"
     store.set_setting("learning", "off")
     assert _code(learnings.record, "email-polisher", "x") == ("LEARNING_OFF", {})
+
+
+def test_load_of_vanished_library_folder_is_source_missing(tmp_home):
+    import shutil
+
+    from skillswiki import paths
+    install_fixture_skills(tmp_home / "native")
+    discovery.sync_db()
+    library.adopt("email-polisher")
+    shutil.rmtree(paths.library_dir() / "email-polisher")
+    assert _code(loader.load, "email-polisher")[0] == "SOURCE_MISSING"

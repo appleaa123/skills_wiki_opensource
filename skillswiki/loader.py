@@ -17,7 +17,11 @@ def load(slug: str) -> dict:
     if row["status"] != "adopted":
         raise SkillsWikiError("NOT_ADOPTED", f"skill '{slug}' is not adopted; the agent loads it natively", slug=slug)
     folder = Path(row["path"])
-    skill_md = (folder / frontmatter.SKILL_FILE).read_text(encoding="utf-8", errors="replace")
+    try:
+        skill_md = (folder / frontmatter.SKILL_FILE).read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        raise SkillsWikiError("SOURCE_MISSING", f"'{slug}' is no longer at {folder} — run: skillswiki scan",
+                              path=str(folder)) from exc
     files = sorted(f.relative_to(folder).as_posix() for f in folder.rglob("*")
                    if f.is_file() and "__pycache__" not in f.parts and f.name != ".DS_Store")
     block = learnings.block_for(slug)

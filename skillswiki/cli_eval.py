@@ -61,6 +61,7 @@ def _unique_result_path(slug: str):
 
 def cmd_run(args) -> None:
     from skillswiki.evals import runner
+    from skillswiki.evals.backends import BackendUnavailable
 
     config = load_config()
     arms, runs = _arms_runs(args, config)
@@ -84,6 +85,8 @@ def cmd_run(args) -> None:
             judge_model=args.judge_model, runs=runs, arms=arms, config=config, concurrency=args.concurrency,
             tier=args.tier, allow_large=args.allow_large, cache_baseline=args.tier is not None,
             learnings_block=block, learnings_meta=meta, cascade=args.cascade)
+    except BackendUnavailable as exc:
+        raise SkillsWikiError("BACKEND_UNAVAILABLE", str(exc), backend=args.executor) from exc
     except (runner.BudgetExceeded, runner.NoIndependentJudgeAvailable, FileNotFoundError) as exc:
         raise ValueError(str(exc)) from exc
     out = _unique_result_path(args.slug)
