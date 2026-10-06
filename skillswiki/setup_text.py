@@ -1,4 +1,5 @@
 """Everything `skillswiki setup` and `skillswiki uninstall` say, kept in one place so the wording stays consistent."""
+import os
 from pathlib import Path
 
 from skillswiki import paths
@@ -78,7 +79,7 @@ def _link_warnings(warnings: list[dict]) -> list[str]:
     """One line per folder that other tools' links point into, instead of one per skill."""
     groups: dict[str, list[dict]] = {}
     for w in warnings:
-        groups.setdefault(str(Path(w.get("target", "")).parent), []).append(w)
+        groups.setdefault(os.path.dirname(w.get("target", "")), []).append(w)  # keeps the path exactly as given
     lines = []
     for folder, items in groups.items():
         if len(items) == 1:
