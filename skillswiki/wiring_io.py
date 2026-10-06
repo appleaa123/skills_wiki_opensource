@@ -209,7 +209,7 @@ def _block_add(text: str, block: str, begin: str) -> str | None:
 
 
 def _block_strip(text: str, begin: str, end: str) -> str:
-    return re.sub(rf"\n?{re.escape(begin)}\n.*?{re.escape(end)}\n?", "", text, flags=re.S)
+    return re.sub(rf"(\r?\n)?{re.escape(begin)}\r?\n.*?{re.escape(end)}(\r?\n)?", "", text, flags=re.S)
 
 
 def _toml_add(text: str, path: Path) -> bytes | None:

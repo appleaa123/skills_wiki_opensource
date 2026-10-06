@@ -188,3 +188,15 @@ def test_non_utf8_file_is_never_touched():
     with pytest.raises(errors.SkillsWikiError):
         wiring_io.apply(MD, "gemini_cli:rules")
     assert path.read_bytes() == "# caf\xe9\n".encode("latin-1")
+
+
+def test_block_is_removed_from_a_file_saved_with_crlf_line_endings():
+    """CI on Windows: an editor (or Windows text mode) rewrites the file with CRLF; our block must still go."""
+    rules = wiring_data.by_key("cline").rules
+    wiring_io.apply(rules, "cline:rules")
+    path = wiring_io.resolve(rules)
+    crlf = path.read_bytes().replace(b"\n", b"\r\n") + b"\r\nmy own notes\r\n"
+    path.write_bytes(crlf)
+    wiring_io.remove(rules, "cline:rules")
+    data = path.read_bytes()
+    assert b"my own notes" in data and b"skillswiki" not in data
