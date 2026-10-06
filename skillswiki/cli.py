@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 
-from skillswiki import cards, discovery, learnings, library, loader, paths, store
+from skillswiki import cards, discovery, errors, learnings, library, loader, paths, store
 from skillswiki.route import suggest
 
 CONFIG_KEYS = {"learning": ("on", "off")}
@@ -140,7 +140,7 @@ def cmd_enrich(args) -> None:
     try:
         card = cards.enrich(args.slug, args.backend)
     except BackendUnavailable as exc:
-        raise ValueError(str(exc)) from exc
+        raise errors.SkillsWikiError("BACKEND_UNAVAILABLE", str(exc), backend=args.backend) from exc
     _print(card, args.json, json.dumps(card, indent=2))
 
 
@@ -286,7 +286,10 @@ def main(argv: list[str] | None = None) -> int:
         paths.load_env()
         args.func(args)
     except ValueError as exc:
-        print(f"skillswiki: {exc}", file=sys.stderr)
+        if args.json:
+            print(json.dumps({"ok": False, **errors.as_payload(exc)}), file=sys.stderr)
+        else:
+            print(f"skillswiki: {exc}", file=sys.stderr)
         return 1
     return 0
 

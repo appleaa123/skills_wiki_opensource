@@ -128,3 +128,17 @@ def test_adopt_dry_run_prints_foreign_link_warning(tmp_home, capsys):
     run(capsys, "scan")
     code, out, _ = run(capsys, "adopt", "meeting-notes", "--dry-run")
     assert code == 0 and "warning:" in out and "another tool" in out
+
+
+def test_json_error_shape(tmp_home, capsys):
+    code, out, err = run(capsys, "--json", "adopt", "nope")
+    assert code == 1 and out == ""
+    payload = json.loads(err)
+    assert payload == {"ok": False, "code": "NOT_FOUND", "message": payload["message"], "details": {"slug": "nope"}}
+    assert "not found" in payload["message"]
+
+
+def test_json_error_shape_for_bare_value_error(tmp_home, capsys):
+    code, _, err = run(capsys, "--json", "release")
+    assert code == 1 and json.loads(err) == {"ok": False, "code": "INVALID_INPUT",
+                                             "message": "give a skill slug or --all", "details": {}}

@@ -144,3 +144,12 @@ def test_validation_errors_are_400(web):
 def test_body_too_large(web):
     status, body = call(web, "POST", "/api/skills/email-polisher/learnings", {"body": "x" * 70000})
     assert status == 400 and "too large" in body["error"]
+
+
+def test_errors_carry_codes(web):
+    status, body = call(web, "POST", "/api/skills/nope/adopt", {})
+    assert status == 400 and body["ok"] is False and body["code"] == "NOT_FOUND" and "not found" in body["error"]
+    status, body = call(web, "POST", "/api/skills/email-polisher/adopt", {})
+    assert status == 400 and body["code"] == "ALREADY_ADOPTED"
+    status, body = call(web, "GET", "/api/nope")
+    assert status == 404 and body == {"ok": False, "error": "not found"}

@@ -5,7 +5,7 @@ user has 5 skills or 500.
 """
 from fastmcp import FastMCP
 
-from skillswiki import learnings, loader, paths, store
+from skillswiki import errors, learnings, loader, paths, store
 from skillswiki.route import suggest
 
 INSTRUCTIONS = (
@@ -21,11 +21,16 @@ INSTRUCTIONS = (
 mcp = FastMCP("skills-wiki", instructions=INSTRUCTIONS)
 
 
+def _fail(exc: BaseException) -> dict:
+    payload = errors.as_payload(exc)
+    return {"error": payload["message"], "code": payload["code"], "details": payload["details"]}
+
+
 def _guard(fn, *args, **kwargs) -> dict:
     try:
         return fn(*args, **kwargs)
     except ValueError as exc:
-        return {"error": str(exc)}
+        return _fail(exc)
 
 
 @mcp.tool
@@ -71,7 +76,7 @@ def learning_record(slug: str, body: str, supersedes: list[int] | None = None) -
         supersedes: Optional ids (from learning_list or [#id] markers in a loaded skill) this one replaces.
     """
     if not learnings.enabled():
-        return {"error": learnings.LEARNING_OFF_MESSAGE}
+        return _fail(errors.SkillsWikiError("LEARNING_OFF", learnings.LEARNING_OFF_MESSAGE))
     problem = _guard(learnings.require_adopted, slug)
     if problem:
         return problem
@@ -84,7 +89,7 @@ def learning_list(slug: str) -> dict:
     """List the user's live learnings for one skill — call before learning_record to avoid near-duplicates and
     to find ids to supersede. Returns {"learnings": [{id, slug, body, created_at}]} or {"error": str}."""
     if not learnings.enabled():
-        return {"error": learnings.LEARNING_OFF_MESSAGE}
+        return _fail(errors.SkillsWikiError("LEARNING_OFF", learnings.LEARNING_OFF_MESSAGE))
     rows = learnings.list_live(slug)
     return {"learnings": [{k: r[k] for k in ("id", "slug", "body", "created_at")} for r in rows]}
 

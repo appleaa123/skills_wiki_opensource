@@ -6,8 +6,9 @@ GET  /api/skills/<slug>/learnings | /evals | /card
 POST /api/skills/<slug>/adopt | /release | /enrich | /learnings
 PUT  /api/skills/<slug>/card            PUT /api/learnings/<id>        DELETE /api/learnings/<id>
 
-Responses: {"ok": true, "data": ...} or {"ok": false, "error": "..."}. Guards: the Host header must be this
-server (DNS-rebinding), and every non-GET request needs the X-Skillswiki-Token generated at start (CSRF).
+Responses: {"ok": true, "data": ...} or {"ok": false, "error": "...", "code": "..."} (code on 400s).
+Guards: the Host header must be this server (DNS-rebinding), and every non-GET request needs the
+X-Skillswiki-Token generated at start (CSRF).
 """
 import json
 import os
@@ -17,7 +18,8 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlparse
 
-from skillswiki import cards, learnings, library, paths
+from skillswiki import cards, errors, learnings, library, paths
+from skillswiki.evals.backends import BackendUnavailable
 from skillswiki.web import queries
 
 HOST = "127.0.0.1"
@@ -79,8 +81,11 @@ class Handler(BaseHTTPRequestHandler):
     def _ok(self, data) -> None:
         self._send(HTTPStatus.OK, {"ok": True, "data": data})
 
-    def _error(self, status: int, message: str) -> None:
-        self._send(status, {"ok": False, "error": message})
+    def _error(self, status: int, message: str, code: str | None = None) -> None:
+        payload = {"ok": False, "error": message}
+        if code:
+            payload["code"] = code
+        self._send(status, payload)
 
     def _host_ok(self) -> bool:
         return self.headers.get("Host", "") in {f"{HOST}:{self.port}", f"localhost:{self.port}"}
@@ -123,7 +128,9 @@ class Handler(BaseHTTPRequestHandler):
         except NotFound:
             return self._error(HTTPStatus.NOT_FOUND, "not found")
         except ValueError as exc:
-            return self._error(HTTPStatus.BAD_REQUEST, str(exc))
+            return self._error(HTTPStatus.BAD_REQUEST, str(exc), errors.as_payload(exc)["code"])
+        except BackendUnavailable as exc:
+            return self._error(HTTPStatus.BAD_REQUEST, str(exc), "BACKEND_UNAVAILABLE")
         except Exception as exc:  # noqa: BLE001 — a local tool: show the user what failed
             return self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"{type(exc).__name__}: {exc}")
 
