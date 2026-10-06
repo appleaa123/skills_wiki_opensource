@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS wiring_files (
   path TEXT PRIMARY KEY, created INTEGER NOT NULL,  -- 1: the file did not exist before setup
   original TEXT,                                    -- copy of the pre-setup bytes (NULL when created)
   written_sha TEXT NOT NULL,                        -- sha256 of what we last wrote
-  parts TEXT NOT NULL DEFAULT '[]');                -- JSON [{"user": "<agent>:<slot>", "part": "<id>"}]
+  parts TEXT NOT NULL DEFAULT '[]',                 -- JSON [{"user": "<agent>:<slot>", "part": "<id>"}]
+  made_dirs TEXT NOT NULL DEFAULT '[]');            -- JSON folders setup created for this file, deepest first
 """
 
 
@@ -68,6 +69,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     wiring_columns = {r["name"] for r in conn.execute("PRAGMA table_info(wiring)")}
     if "vouched" not in wiring_columns:  # databases created by v0.3.0
         conn.execute("ALTER TABLE wiring ADD COLUMN vouched INTEGER NOT NULL DEFAULT 0")
+    file_columns = {r["name"] for r in conn.execute("PRAGMA table_info(wiring_files)")}
+    if "made_dirs" not in file_columns:  # databases created by v0.3.0 / v0.3.1
+        conn.execute("ALTER TABLE wiring_files ADD COLUMN made_dirs TEXT NOT NULL DEFAULT '[]'")
 
 
 @contextmanager

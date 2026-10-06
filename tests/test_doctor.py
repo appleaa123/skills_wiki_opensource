@@ -142,3 +142,10 @@ def test_doctor_lists_wiring(tmp_home):
     wiring.apply("codex", "hook")
     rep = doctor.report()
     assert rep["wiring"][0]["agent"] == "codex" and "codex hook untested" in doctor.human(rep)
+
+
+def test_doctor_shows_tested_by_skills_wiki(tmp_home):
+    from skillswiki import wiring
+    wiring.apply("claude_code", "hook")
+    wiring.set_vouched("claude_code")
+    assert "claude_code hook tested by Skills Wiki" in doctor.human(doctor.report())

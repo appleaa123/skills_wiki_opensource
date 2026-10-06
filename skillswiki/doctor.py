@@ -120,7 +120,8 @@ def human(rep: dict) -> str:
              "agents detected: " + (", ".join(detected) or "none"),
              "AI CLIs on PATH: " + (", ".join(k for k, v in rep["clis"].items() if v) or "none"),
              f"TypeSafe key set: {'yes' if rep['typesafe_key_set'] else 'no'}  JEV: {rep['jev']}",
-             "Agent wiring: " + (", ".join(f"{w['agent']} {w['method']} {w['test']}" for w in rep["wiring"])
+             "Agent wiring: " + (", ".join(f"{w['agent']} {w['method']} {'tested by Skills Wiki' if w.get('vouched') else w['test']}"
+                                            for w in rep["wiring"])
                                  or "none"),
              "Claude Code: " + "  ".join(f"{k} {v}" for k, v in rep["claude_code"].items())]
     return "\n".join(lines)

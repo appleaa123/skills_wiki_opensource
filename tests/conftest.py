@@ -39,3 +39,14 @@ def tmp_home(tmp_path, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.chdir(work)
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def no_real_agent_or_ai_cli(monkeypatch):
+    """No test may run a real agent CLI (`claude mcp add`) or spend AI tokens: tests that need them patch these."""
+    from skillswiki import paraphrase, wiring
+
+    def refuse(name):
+        raise AssertionError(f"tests never call a real AI CLI ({name}); patch paraphrase.get_backend")
+    monkeypatch.setattr(wiring, "_which", lambda name: None)
+    monkeypatch.setattr(paraphrase, "get_backend", refuse)

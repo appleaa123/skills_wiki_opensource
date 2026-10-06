@@ -122,3 +122,28 @@ def test_remove_all_survives_a_file_the_user_broke():
     result = wiring.remove_all("gemini_cli")
     assert result["method"]["state"] == "self_setup" and "remove the Skills Wiki entry" in result["method"]["prompt"]
     assert wiring.get_row("gemini_cli") is None
+
+
+def test_undo_backs_up_the_file_first():
+    """Cleanup: the test-fallback path stripped files without a backup."""
+    import zipfile
+    agents_md = _home(".codex/AGENTS.md")
+    agents_md.parent.mkdir(parents=True)
+    agents_md.write_text("# my codex rules\n", encoding="utf-8")
+    wiring.apply("codex", "rules")
+    zip_path = backup.start()
+    wiring.undo("codex", "rules", zip_path)
+    assert "config/.codex/AGENTS.md" in zipfile.ZipFile(zip_path).namelist()
+
+
+def test_a_v02_local_server_under_another_name_counts_as_present(monkeypatch):
+    """Cleanup: the v0.2 README registered the local server as `skills-wiki`; don't add a second one."""
+    _home(".claude.json").write_text(json.dumps({"mcpServers": {"skills-wiki": {
+        "command": "skillswiki", "args": ["serve-mcp"]}}}), encoding="utf-8")
+    monkeypatch.setattr(wiring.subprocess, "run", lambda *a, **k: pytest.fail("must not call the CLI"))
+    assert wiring.apply("claude_code", "rules")["mcp"]["state"] == "present"
+
+
+def test_agent_clis_are_off_in_every_test():
+    """Cleanup: conftest guards every test against running a real agent CLI."""
+    assert wiring._which("claude") is None

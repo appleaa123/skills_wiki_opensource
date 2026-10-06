@@ -199,7 +199,7 @@ def wire_agent(io: Io, mode: str, key: str, zip_path, get_test, already_applied:
             wiring.set_test(key, answer)
             return _outcome(key, method, answer)
         io.say(text.TRY_NEXT)
-        undone = wiring.undo(key, method)
+        undone = wiring.undo(key, method, zip_path)
         if undone.get("prompt"):
             io.say(undone["prompt"])
     return _outcome(key, order[-1], "failed")

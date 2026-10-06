@@ -34,7 +34,7 @@ NOT_ON_PATH = ("Warning: the `skillswiki` command is not on your PATH, so your a
 GUI_PATH_NOTE = ("Note: an agent you start from the Dock or Start menu may not see your terminal's PATH. If its test "
                  "fails, start it from a terminal and run `skillswiki setup --test <agent>` again.")
 TRY_NEXT = "Undoing that and trying the next way."
-NO_TEST_SKILL = "There is no adopted skill to test with yet, so testing is skipped. Later: skillswiki setup --test all"
+NO_TEST_SKILL = "No test request, so testing is skipped for now. Later: skillswiki setup --test all"
 PARAPHRASE_NOTICE = ("To test each agent I need a request one of your skills should handle, in different words from "
                      "its description. I'm asking {backend} to write one; this uses a few of your tokens.")
 ASK_REQUEST = "Your request (or press Enter to skip testing):"
@@ -70,9 +70,23 @@ def plan_lines(preview: dict) -> str:
                   for c in p["differing_copies"]]
         lines += [f"    note: {c} is what a link points to; it stays so the link keeps working"
                   for c in p["linked_copies"]]
-        lines += [f"    warning: {w['message']}" for w in p.get("warnings", [])]
     lines += [f"  can't move {f['slug']}: {f['error']}" for f in preview["failed"]]
-    return "\n".join(lines)
+    return "\n".join(lines + _link_warnings([w for p in moving for w in p.get("warnings", [])]))
+
+
+def _link_warnings(warnings: list[dict]) -> list[str]:
+    """One line per folder that other tools' links point into, instead of one per skill."""
+    groups: dict[str, list[dict]] = {}
+    for w in warnings:
+        groups.setdefault(str(Path(w.get("target", "")).parent), []).append(w)
+    lines = []
+    for folder, items in groups.items():
+        if len(items) == 1:
+            lines.append(f"  warning: {items[0]['message']}")
+        else:
+            lines.append(f"  note: {len(items)} of these skills are links into {folder}, placed by another tool. That "
+                         "tool may put them back after you adopt; adopting moves only the links.")
+    return lines
 
 
 def wiring_lines(items: list[tuple[str, list[str], str]]) -> str:
