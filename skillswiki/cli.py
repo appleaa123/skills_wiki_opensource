@@ -74,8 +74,31 @@ def cmd_agents(args) -> None:
 
 
 def cmd_adopt(args) -> None:
+    if args.all:
+        return cmd_adopt_all(args)
+    if not args.slug:
+        raise ValueError("give a skill slug or --all")
     result = library.plan_adopt(args.slug) if args.dry_run else library.adopt(args.slug)
     _print(result, args.json, _adopt_lines(result, args.dry_run))
+
+
+def cmd_adopt_all(args) -> None:
+    from skillswiki import backup
+    discovery.sync_db()
+    preview = library.adopt_all(dry_run=True)
+    zip_path = backup.start("adopt") if preview["adopted"] and not args.dry_run else None
+    result = preview if args.dry_run else library.adopt_all(zip_path=zip_path)
+    n = len(result["adopted"])
+    if not n and not result["failed"]:
+        return _print(result, args.json, "No new skills to adopt.")
+    verb = "Would adopt" if args.dry_run else "Adopted"
+    lines = [f"{verb} {n} skill{'s' if n != 1 else ''}."]
+    lines += [f"  {p['slug']}: {p['from']} -> {p['to']}" for p in result["adopted"]]
+    lines += [f"  FAILED {f['slug']}: {f['error']}" for f in result["failed"]]
+    lines += [f"Backup: {zip_path}"] if zip_path else []
+    _print({**result, "backup": str(zip_path) if zip_path else None}, args.json, "\n".join(lines))
+    if result["failed"]:
+        raise ValueError(f"{len(result['failed'])} skill(s) could not be adopted; see above")
 
 
 def _release_lines(result: dict, dry_run: bool) -> str:
@@ -154,6 +177,13 @@ def cmd_enrich(args) -> None:
 
 
 def cmd_learn(args) -> None:
+    if args.action == "export":
+        written = learnings.export_markdown(args.slug)
+        human = ("\n".join(f"Wrote {p}" for p in written) if written
+                 else f"No current learnings{' for ' + args.slug if args.slug else ''}.")
+        return _print({"files": [str(p) for p in written]}, args.json, human)
+    if not args.slug:
+        raise ValueError("give a skill slug")
     if args.action == "add":
         if learnings.enabled():
             learnings.require_adopted(args.slug)
@@ -233,8 +263,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--status", choices=["adopted", "native", "plugin"])
     p.set_defaults(func=cmd_list)
     sub.add_parser("agents", help="list the agents whose skill folders are scanned").set_defaults(func=cmd_agents)
-    p = sub.add_parser("adopt", help="move a skill into the Skills Wiki library")
-    p.add_argument("slug")
+    p = sub.add_parser("adopt", help="move a skill into the Skills Wiki library (--all: every new skill)")
+    p.add_argument("slug", nargs="?")
+    p.add_argument("--all", action="store_true", help="adopt every skill not adopted yet (scans first)")
     p.add_argument("--dry-run", dest="dry_run", action="store_true", help="show what would move; move nothing")
     p.set_defaults(func=cmd_adopt)
     p = sub.add_parser("load", help="print an adopted skill with its learnings")
@@ -261,9 +292,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--backend", default="claude", choices=["claude", "codex", "gemini"])
     p.set_defaults(func=cmd_enrich)
 
-    p = sub.add_parser("learn", help="add, list or retire learnings")
-    p.add_argument("action", choices=["add", "list", "retire"])
-    p.add_argument("slug", help="skill slug (for retire: the learning id)")
+    p = sub.add_parser("learn", help="add, list, retire or export learnings")
+    p.add_argument("action", choices=["add", "list", "retire", "export"])
+    p.add_argument("slug", nargs="?", help="skill slug (for retire: the learning id; optional for export)")
     p.add_argument("text", nargs="?", default="")
     p.add_argument("--supersedes", help="comma-separated learning ids this one replaces")
     p.add_argument("--all", action="store_true", help="include superseded and retired learnings")
@@ -277,6 +308,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     from skillswiki import cli_eval
     cli_eval.register(sub)
+    from skillswiki import cli_setup
+    cli_setup.register(sub)
 
     p = sub.add_parser("ui", help="open the local management page")
     p.add_argument("--port", type=int, default=7878)
@@ -288,7 +321,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_doctor)
 
     sub.add_parser("serve-mcp", help="run the MCP server over stdio").set_defaults(func=cmd_serve_mcp)
-    sub.add_parser("hook", help="Claude Code UserPromptSubmit hook (reads stdin)").set_defaults(func=cmd_hook)
+    p = sub.add_parser("hook", help="per-prompt hook for your agents (reads stdin; --agent KEY)")
+    p.add_argument("--agent", default="claude_code")
+    p.set_defaults(func=cmd_hook)
     return parser
 
 
@@ -306,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["hook"]:  # runs on every prompt: never print a traceback, always exit 0
         from skillswiki import hook
-        hook.main()
+        hook.main(argv[1:])
         return 0
     args = build_parser().parse_args(argv)
     try:

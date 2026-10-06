@@ -1,16 +1,16 @@
-"""Claude Code UserPromptSubmit hook: route every prompt and add a one-line suggestion to the context.
-
-Input (stdin JSON): {"prompt": "...", ...}. Output: {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
-"additionalContext": "..."}} (per https://code.claude.com/docs/en/hooks). Never prints the skill body, and never
-blocks the user's prompt: any error prints nothing and exits 0.
+"""Per-prompt hook for every agent that has one: route the prompt and add one line of advice to the model's context,
+in the reply format that agent expects (wiring_data hook_format). Formats per the agents' docs; see
+plan/research_agent_wiring.md. Never prints the skill body and never blocks the prompt: any error prints nothing and
+exits 0. Without --agent it behaves exactly as before (Claude Code, https://code.claude.com/docs/en/hooks).
 """
 import json
 import sys
 
 MIN_PROMPT_CHARS = 15
-BUDGET_S = 5.0  # well inside Claude Code's hook timeout; past it, keyword routing answers
+BUDGET_S = 5.0  # well inside every agent's hook timeout; past it, keyword routing answers
 SHORTLIST_SHOWN = 3
 EVENT = "UserPromptSubmit"
+DEFAULT_AGENT = "claude_code"
 
 
 def context_line(result: dict) -> str:
@@ -25,22 +25,45 @@ def context_line(result: dict) -> str:
     return ""
 
 
-def respond(payload: dict) -> str:
-    prompt = (payload.get("prompt") or "").strip()
-    if len(prompt) < MIN_PROMPT_CHARS or prompt.startswith("/"):
-        return ""
-    from skillswiki.route import suggest
-    line = context_line(suggest(prompt, budget_s=BUDGET_S))
+def _prompt(fmt: str, payload: dict) -> str:
+    if fmt == "hermes":  # shell hooks may carry it under "extra"
+        return payload.get("user_message") or (payload.get("extra") or {}).get("user_message") or ""
+    return payload.get("prompt") or ""
+
+
+def _reply(fmt: str, event: str, line: str) -> str:
     if not line:
         return ""
-    return json.dumps({"hookSpecificOutput": {"hookEventName": EVENT, "additionalContext": line}})
+    if fmt == "hermes":
+        return json.dumps({"context": line})
+    return json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": line}})
 
 
-def main() -> None:
+def respond(payload: dict, agent: str = DEFAULT_AGENT) -> str:
+    from skillswiki import wiring_data
+    w = wiring_data.by_key(agent)
+    fmt = w.hook_format or "claude"
+    if fmt == "antigravity":  # its hook never sees the prompt: inject the standing reminder instead
+        return json.dumps({"injectSteps": [{"ephemeralMessage": wiring_data.RULES_TEXT}]})
+    event = (w.hook.detail.get("keys") or [EVENT])[-1] if w.hook else EVENT
+    prompt = _prompt(fmt, payload).strip()
+    if len(prompt) < MIN_PROMPT_CHARS or prompt.startswith("/"):
+        return _reply(fmt, event, "")
+    from skillswiki.route import suggest
+    return _reply(fmt, event, context_line(suggest(prompt, budget_s=BUDGET_S)))
+
+
+def agent_from(argv: list[str]) -> str:
+    if "--agent" in argv and argv.index("--agent") + 1 < len(argv):
+        return argv[argv.index("--agent") + 1]
+    return DEFAULT_AGENT
+
+
+def main(argv: list[str] | None = None) -> None:
     try:
         from skillswiki import paths
         paths.load_env()
-        out = respond(json.loads(sys.stdin.read() or "{}"))
+        out = respond(json.loads(sys.stdin.read() or "{}"), agent_from(argv or []))
     except Exception:
         out = ""
     if out:

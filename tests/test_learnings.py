@@ -71,3 +71,28 @@ def test_block_size_cap_never_cuts_a_line():
     block = learnings.build_learnings_block("s", rows)
     assert len(block) <= learnings.LEARNINGS_BLOCK_MAX_CHARS + len("<learnings>\n\n</learnings>")
     assert all(line.endswith("y" * 590) for line in block.splitlines() if line.startswith("- [#"))
+
+
+def test_export_has_only_current_learnings(tmp_home):
+    from skillswiki import paths
+    first = learnings.record("email-polisher", "Sign off with Best.")
+    learnings.record("email-polisher", "Sign off with Cheers.", supersedes=[first])
+    gone = learnings.record("email-polisher", "Use emoji.")
+    learnings.retire(gone)
+    [path] = learnings.export_markdown("email-polisher")
+    text = path.read_text(encoding="utf-8")
+    assert path == paths.home() / "learnings" / "email-polisher.md"
+    assert "1. Sign off with Cheers." in text and "Best" not in text and "emoji" not in text
+    assert "paste them into the skill's SKILL.md" in text and str(paths.db_path()) in text
+
+
+def test_export_all_and_none(tmp_home):
+    learnings.record("a", "Rule A.")
+    learnings.record("plug:b", "Rule B.")
+    assert sorted(p.name for p in learnings.export_markdown()) == ["a.md", "plug__b.md"]
+    assert learnings.export_markdown("nothing-here") == []
+
+
+def test_export_refuses_a_path_as_slug(tmp_home):
+    with pytest.raises(ValueError):
+        learnings.export_markdown("../escape")

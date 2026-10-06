@@ -78,13 +78,21 @@ def learning_record(slug: str, body: str, supersedes: list[int] | None = None) -
 
 
 @mcp.tool
-def learning_list(slug: str) -> dict:
+def learning_list(slug: str, export: bool = False) -> dict:
     """List the user's live learnings for one skill — call before learning_record to avoid near-duplicates and
-    to find ids to supersede. Returns {"learnings": [{id, slug, body, created_at}]} or {"error": str}."""
+    to find ids to supersede. With export=true, also write them to a Markdown file the user can keep (for "export
+    my learnings for <skill>"). Returns {"learnings": [{id, slug, body, created_at}], "exported_to"?: path} or
+    {"error": str}."""
     if not learnings.enabled():
         return _fail(errors.SkillsWikiError("LEARNING_OFF", learnings.LEARNING_OFF_MESSAGE))
     rows = learnings.list_live(slug)
-    return {"learnings": [{k: r[k] for k in ("id", "slug", "body", "created_at")} for r in rows]}
+    result = {"learnings": [{k: r[k] for k in ("id", "slug", "body", "created_at")} for r in rows]}
+    if export:
+        written = _guard(learnings.export_markdown, slug)
+        if isinstance(written, dict):
+            return written
+        result["exported_to"] = str(written[0]) if written else None
+    return result
 
 
 def run() -> None:

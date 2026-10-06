@@ -86,6 +86,11 @@ def claude_code_status() -> dict:
             "mcp_project": _mcp_registered(_json_file(cwd / ".mcp.json"))}
 
 
+def _wiring() -> list[dict]:
+    from skillswiki import wiring
+    return wiring.rows()
+
+
 def report() -> dict:
     db_present = paths.db_path().is_file()  # checked before any store.connect(), which would create it
     adopted, missing = _adopted() if db_present else ([], [])
@@ -98,7 +103,7 @@ def report() -> dict:
             "agents": agents.rows(),
             "clis": {name: bool(shutil.which(name)) for name in CLIS},
             "typesafe_key_set": bool(os.getenv("TYPESAFE_API_KEY")), "jev": "on" if jev_enabled() else "off",
-            "claude_code": claude_code_status()}
+            "claude_code": claude_code_status(), "wiring": _wiring() if db_present else []}
 
 
 def human(rep: dict) -> str:
@@ -115,6 +120,8 @@ def human(rep: dict) -> str:
              "agents detected: " + (", ".join(detected) or "none"),
              "AI CLIs on PATH: " + (", ".join(k for k, v in rep["clis"].items() if v) or "none"),
              f"TypeSafe key set: {'yes' if rep['typesafe_key_set'] else 'no'}  JEV: {rep['jev']}",
+             "Agent wiring: " + (", ".join(f"{w['agent']} {w['method']} {w['test']}" for w in rep["wiring"])
+                                 or "none"),
              "Claude Code: " + "  ".join(f"{k} {v}" for k, v in rep["claude_code"].items())]
     return "\n".join(lines)
 

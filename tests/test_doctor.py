@@ -135,3 +135,10 @@ def test_env_keys_strips_a_leading_export(tmp_home):
     env.parent.mkdir(parents=True, exist_ok=True)
     env.write_text("export TYPESAFE_API_KEY=abc\nOTHER=1\n", encoding="utf-8")
     assert doctor._env_keys(env) == ["OTHER", "TYPESAFE_API_KEY"]
+
+
+def test_doctor_lists_wiring(tmp_home):
+    from skillswiki import wiring
+    wiring.apply("codex", "hook")
+    rep = doctor.report()
+    assert rep["wiring"][0]["agent"] == "codex" and "codex hook untested" in doctor.human(rep)
