@@ -21,6 +21,10 @@ MIN_TOKEN_LEN = 2
 _CJK_CHARS = "\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff"  # kana, CJK, Hangul
 _SPLIT = re.compile(rf"[^a-z0-9{_CJK_CHARS}]+")
 _CJK_RUN = re.compile(rf"([{_CJK_CHARS}]+)")
+# Character pairs built on these everyday characters (or listed whole) match almost any Chinese text, so they are not
+# indexed: "帮我", "一个", "我想" made unrelated requests match long Chinese descriptions (Phase 12 review).
+CJK_STOP_CHARS = frozenset("一我你他她它的了是在个这那么吗呢吧啊和也就都把被给帮想让")
+CJK_STOP_PAIRS = frozenset({"用户"})
 STOPWORDS = frozenset("""
 a an and are as at be but by can could do for from has have how i if in into is it its make me my of on or our
 please so that the their them then there these this to us was we what when which will with would you your
@@ -38,9 +42,14 @@ def _stem(token: str) -> str:
     return token
 
 
+def has_cjk(text: str) -> bool:
+    return bool(_CJK_RUN.search(text or ""))
+
+
 def _cjk_pairs(run: str) -> list[str]:
     """Chinese and Japanese have no spaces between words: index overlapping character pairs instead."""
-    return [run] if len(run) == 1 else [run[i:i + 2] for i in range(len(run) - 1)]
+    pairs = [run] if len(run) == 1 else [run[i:i + 2] for i in range(len(run) - 1)]
+    return [p for p in pairs if p not in CJK_STOP_PAIRS and not CJK_STOP_CHARS.intersection(p)]
 
 
 def tokenize(text: str) -> list[str]:

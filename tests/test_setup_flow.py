@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from helpers import scripted, snapshot, two_agents
+from helpers import install_fixture_skills, scripted, snapshot, two_agents
 
 from skillswiki import backup, setup_flow, wiring
 from skillswiki.setup_flow import AUTOMATIC
@@ -195,3 +195,40 @@ def test_vouched_agents_are_not_asked_again_on_a_rerun(tmp_home):
     setup_flow.run(scripted([])[0], mode=AUTOMATIC)
     result = setup_flow.run(scripted([])[0], mode=AUTOMATIC)
     assert [o["agent"] for o in result["agents"]] == ["codex"]
+
+
+def test_run_tests_survives_input_ending_at_the_request_question(tmp_home, monkeypatch):
+    """Review: --test must not traceback when the free-text request question gets no input."""
+    two_agents()
+    setup_flow.run(scripted([])[0], mode=AUTOMATIC)
+    monkeypatch.setattr(setup_flow.paraphrase, "from_ai", lambda description, backend: None)
+    io, said = scripted([])  # input ends at "Your request"
+    assert setup_flow.run_tests(io, "codex") == [] and "Stopped" in " ".join(said)
+
+
+def test_no_vouching_when_the_hook_was_not_written(tmp_home):
+    """Review: our result vouches only for a hook that is actually installed."""
+    home = two_agents()
+    (home / ".claude" / "settings.json").write_text("{ // comments\n}", encoding="utf-8")
+    result = setup_flow.run(scripted([])[0], mode=AUTOMATIC)
+    claude = result["agents"][0]
+    assert claude["agent"] == "claude_code" and claude["test"] == "untested" and claude["self_setup"]
+    assert not wiring.get_row("claude_code")["vouched"]
+
+
+def test_no_tokens_spent_when_the_user_skips_the_only_test(tmp_home, monkeypatch):
+    """Review: the AI paraphrase is requested only when a test is actually about to run."""
+    home = Path.home()
+    install_fixture_skills(home / ".claude" / "skills", ["email-polisher"])  # Claude Code only
+    calls = []
+    monkeypatch.setattr(setup_flow.paraphrase, "from_ai", lambda d, b: calls.append(d) or "other words")
+    setup_flow.run(scripted(["g", "y", "y", "n"])[0])  # go; claude: wire, skip test
+    assert calls == []
+
+
+def test_skipping_a_retest_keeps_the_vouched_mark(tmp_home):
+    """Review: 's' is not a result, so it must not erase 'tested by Skills Wiki'."""
+    two_agents()
+    setup_flow.run(scripted([])[0], mode=AUTOMATIC)
+    setup_flow.run_tests(scripted(["s"])[0], "claude_code")
+    assert wiring.get_row("claude_code")["vouched"] == 1

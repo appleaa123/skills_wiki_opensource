@@ -89,3 +89,18 @@ def test_chinese_request_finds_a_chinese_skill(tmp_home):
     discovery.sync_db()
     library.adopt("video-ideas")
     assert keyword.shortlist("帮我想想这条短视频从哪个角度切入")[0][0] == "video-ideas"
+
+
+@pytest.mark.parametrize("request_", ["帮我查一下今天的天气怎么样", "我想写一个python脚本读取文件",
+                                      "用户登录后跳转到首页", "一份合同的审核意见"])
+def test_everyday_chinese_word_pairs_do_not_match(tmp_home, request_):
+    """Review: generic pairs like 帮我 / 一个 matched long Chinese descriptions."""
+    from skillswiki import discovery, library
+    root = tmp_home / "native" / "video-ideas"
+    root.mkdir(parents=True)
+    (root / "SKILL.md").write_text("---\nname: video-ideas\ndescription: 跟用户对话讨论短视频选题，用户给一个主题，"
+                                   "帮我们提炼切入角度，写一份草稿。我想做一条视频时用它。\n---\nbody\n", encoding="utf-8")
+    discovery.sync_db()
+    library.adopt("video-ideas")
+    assert keyword.shortlist(request_) == []
+    assert keyword.shortlist("帮我想想这条短视频从哪个角度切入")[0][0] == "video-ideas"

@@ -209,3 +209,12 @@ def test_setup_stops_when_input_ends(tmp_home, capsys, monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt="": (_ for _ in ()).throw(EOFError()))
     code, out, _ = run(capsys, "setup")
     assert code == 0 and "Stopped" in out and (Path.home() / ".claude/skills/email-polisher").is_dir()
+
+
+def test_free_text_answers_keep_their_case(monkeypatch):
+    """Review: the typed test request is pasted into an agent, so it must not be lowercased."""
+    from skillswiki import cli_setup
+    monkeypatch.setattr("builtins.input", lambda prompt="": "Polish my CV for Google")
+    assert cli_setup._console_ask("Your request:", ()) == "Polish my CV for Google"
+    monkeypatch.setattr("builtins.input", lambda prompt="": "Y")
+    assert cli_setup._console_ask("ok?", ("y", "n")) == "y"

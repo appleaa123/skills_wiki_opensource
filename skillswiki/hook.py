@@ -7,6 +7,7 @@ import json
 import sys
 
 MIN_PROMPT_CHARS = 15
+MIN_CJK_PROMPT_CHARS = 4  # a Chinese/Japanese/Korean request is complete in far fewer characters
 BUDGET_S = 5.0  # well inside every agent's hook timeout; past it, keyword routing answers
 SHORTLIST_SHOWN = 3
 EVENT = "UserPromptSubmit"
@@ -43,6 +44,11 @@ def _reply(fmt: str, event: str, line: str) -> str:
     return json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": line}})
 
 
+def _long_enough(prompt: str) -> bool:
+    from skillswiki.route.keyword import has_cjk
+    return len(prompt) >= (MIN_CJK_PROMPT_CHARS if has_cjk(prompt) else MIN_PROMPT_CHARS)
+
+
 def respond(payload: dict, agent: str = DEFAULT_AGENT) -> str:
     from skillswiki import wiring_data
     w = wiring_data.by_key(agent)
@@ -51,7 +57,7 @@ def respond(payload: dict, agent: str = DEFAULT_AGENT) -> str:
         return json.dumps({"injectSteps": [{"ephemeralMessage": wiring_data.RULES_TEXT}]})
     event = (w.hook.detail.get("keys") or [EVENT])[-1] if w.hook else EVENT
     prompt = _prompt(fmt, payload).strip()
-    if len(prompt) < MIN_PROMPT_CHARS or prompt.startswith("/"):
+    if not _long_enough(prompt) or prompt.startswith("/"):
         return _reply(fmt, event, "")
     from skillswiki.route import suggest
     return _reply(fmt, event, context_line(suggest(prompt, budget_s=BUDGET_S)))

@@ -143,34 +143,56 @@ def _skips_own_test(io: Io, mode: str, key: str, method: str) -> bool:
     return io.ask(text.ASK_TEST_ANYWAY, (YES, NO)) != YES
 
 
-def _apply_step(io: Io, mode: str, key: str, method: str, zip_path) -> bool:
-    """Apply one method (asking first in guided mode). False when the user declines this agent."""
+def _apply_step(io: Io, mode: str, key: str, method: str, zip_path) -> dict | None:
+    """Apply one method (asking first in guided mode). None when the user declines this agent."""
     name = agents.by_key(key).name
     if mode == GUIDED and method != "advice":
         io.say(text.wire_intro(name, wiring.describe(key, method)))
         if io.ask(text.ASK_WIRE, (YES, NO)) != YES:
-            return False
-    _say_result(io, name, wiring.apply(key, method, zip_path))
-    return True
+            return None
+    result = wiring.apply(key, method, zip_path)
+    _say_result(io, name, result)
+    return result
 
 
-def wire_agent(io: Io, mode: str, key: str, zip_path, test, already_applied: bool = False) -> dict:
+def _installed(result: dict | None) -> bool:
+    """Our test result vouches only for a hook that is really in place, not one the user still has to paste."""
+    return bool(result) and result["state"] in ("written", "shared", "present")
+
+
+def _lazy_request(io: Io):
+    """The test request is only worked out (AI tokens, or a question) when a test is about to run."""
+    cache: dict = {}
+
+    def get():
+        if "request" not in cache:
+            cache["request"] = test_prompt(io)
+        return cache["request"]
+    return get
+
+
+def wire_agent(io: Io, mode: str, key: str, zip_path, get_test, already_applied: bool = False) -> dict:
     order = wiring.methods(key)
     row = wiring.get_row(key)
     if row and row["test"] != "failed" and row["method"] in order:  # a failed agent starts over from its hook
         order = order[order.index(row["method"]):]
     for i, method in enumerate(order):
-        if not (already_applied and i == 0) and not _apply_step(io, mode, key, method, zip_path):
-            return _outcome(key, "skipped", "untested")
+        applied = None
+        if not (already_applied and i == 0):
+            applied = _apply_step(io, mode, key, method, zip_path)
+            if applied is None:
+                return _outcome(key, "skipped", "untested")
         if method == "advice":
             wiring.set_test(key, "failed")
             return _outcome(key, method, "failed")
-        if not already_applied and _skips_own_test(io, mode, key, method):
+        if _installed(applied) and _skips_own_test(io, mode, key, method):
             wiring.set_vouched(key)
             return _outcome(key, method, "vouched")
-        if mode == AUTOMATIC or test is None:
-            if mode == GUIDED:
-                io.say(text.NO_TEST_SKILL)
+        if mode == AUTOMATIC:
+            return _outcome(key, method, "untested")
+        test = get_test()
+        if test is None:
+            io.say(text.NO_TEST_SKILL)
             return _outcome(key, method, "untested")
         answer = guided_test(io, agents.by_key(key).name, test)
         if answer != "no":
@@ -183,10 +205,10 @@ def wire_agent(io: Io, mode: str, key: str, zip_path, test, already_applied: boo
     return _outcome(key, order[-1], "failed")
 
 
-def _wire_safely(io: Io, mode: str, key: str, zip_path, test, already_applied: bool = False) -> dict:
+def _wire_safely(io: Io, mode: str, key: str, zip_path, get_test, already_applied: bool = False) -> dict:
     """One agent's unexpected failure is reported and never stops the others (spec: Errors)."""
     try:
-        return wire_agent(io, mode, key, zip_path, test, already_applied)
+        return wire_agent(io, mode, key, zip_path, get_test, already_applied)
     except Stop:
         raise
     except Exception as exc:  # noqa: BLE001 — a local tool: show the user what failed, keep going
@@ -201,18 +223,14 @@ def go_live(io: Io, mode: str, keys: list[str], zip_path) -> list[dict]:
     todo = [k for k in keys if rows[k]["test"] in ("untested", "failed") and not rows[k]["vouched"]]
     if todo and not _on_path():
         io.say(text.NOT_ON_PATH)
-    test = test_prompt(io) if todo and mode == GUIDED else None
-    return [_wire_safely(io, mode, k, zip_path, test) for k in todo]
+    get_test = _lazy_request(io)
+    return [_wire_safely(io, mode, k, zip_path, get_test) for k in todo]
 
 
 def run_tests(io: Io, which: str) -> list[dict]:
     keys = [r["agent"] for r in wiring.rows()] if which == "all" else [which]
-    test = test_prompt(io)
-    if test is None:
-        io.say(text.NO_TEST_SKILL)
-        return []
     io.say(text.TEST_CHANGES_FILES)
-    results, zip_path = [], None
+    results, zip_path, get_test = [], None, _lazy_request(io)
     try:
         for key in keys:
             row = wiring.get_row(key)
@@ -220,7 +238,8 @@ def run_tests(io: Io, which: str) -> list[dict]:
                 io.say(text.not_connected(key))
                 continue
             zip_path = zip_path or backup.start("test")
-            results.append(_wire_safely(io, GUIDED, key, zip_path, test, already_applied=row["test"] != "failed"))
+            results.append(_wire_safely(io, GUIDED, key, zip_path, get_test,
+                                        already_applied=row["test"] != "failed"))
     except (Stop, KeyboardInterrupt) as exc:
         io.say(text.stopped(str(exc) or "Interrupted."))
     io.say(text.summary(results, zip_path))

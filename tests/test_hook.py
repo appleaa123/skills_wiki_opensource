@@ -103,3 +103,10 @@ def test_shortlist_hint_asks_the_agent_to_check_before_answering(adopted):
     assert "Before you answer" in line and "load_skill" in line and "email-polisher" in line
     assert "otherwise proceed without a skill" not in line
     assert "csv-cleaner" in line and "if it does not fit" in line
+
+
+def test_short_chinese_request_is_routed(adopted):
+    """Review: an 8-character Chinese request is complete; the 15-character gate is for English."""
+    from skillswiki.route import keyword
+    assert hook._long_enough("帮我润色这封邮件") and not hook._long_enough("帮我")
+    assert hook._long_enough("please fix my email draft") and not hook._long_enough("fix my email")

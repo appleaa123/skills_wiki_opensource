@@ -8,11 +8,13 @@ from skillswiki.setup_flow import AUTOMATIC, Io, Stop
 def _console_ask(question: str, choices: tuple[str, ...]) -> str:
     while True:
         try:
-            answer = input(f"{question} ").strip().lower()
+            answer = input(f"{question} ").strip()
         except (EOFError, KeyboardInterrupt) as exc:
             raise Stop("Input ended.") from exc
-        if not choices or answer in choices:  # no choices: free text (the test request)
+        if not choices:  # free text (the test request): keep it exactly as typed
             return answer
+        if answer.lower() in choices:
+            return answer.lower()
         print(f"Please answer one of: {', '.join(choices)}")
 
 
