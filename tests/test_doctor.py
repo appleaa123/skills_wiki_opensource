@@ -123,7 +123,7 @@ def test_two_exports_in_the_same_minute_get_different_files(tmp_home, monkeypatc
     assert first != second and first.is_file() and second.is_file()
 
 
-def test_env_keys_ignores_undecodable_bytes(tmp_home):
+def test_env_keys_survives_undecodable_bytes(tmp_home):
     env = paths.home() / ".env"
     env.parent.mkdir(parents=True, exist_ok=True)
     env.write_bytes(b"GOOD=1\n\xff\xfe=junk\n")

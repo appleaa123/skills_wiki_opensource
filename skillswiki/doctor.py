@@ -141,13 +141,12 @@ def export(out_dir: Path) -> Path:
             files["settings.json"] = {r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM settings")}
         files["usage_summary.json"] = usage.counts("")  # every event; counts only, no text
     stem = f"{EXPORT_PREFIX}{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    path = Path(out_dir) / f"{stem}.zip"
-    for n in range(2, 1000):  # never overwrite an earlier export
-        if not path.exists():
-            break
+    path, n = Path(out_dir) / f"{stem}.zip", 1
+    while path.exists():  # never overwrite an earlier export
+        n += 1
         path = Path(out_dir) / f"{stem}-{n}.zip"
     manifest = paths.library_dir() / library.MANIFEST_NAME
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(path, "x", zipfile.ZIP_DEFLATED) as zf:  # exclusive: fails rather than overwrites
         for name, data in files.items():
             zf.writestr(name, json.dumps(data, indent=2, default=str))
         if manifest.is_file():
