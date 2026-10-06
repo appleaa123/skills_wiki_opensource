@@ -60,3 +60,9 @@ def test_scan_roots_come_from_the_registry(tmp_home):
     assert userhome / ".cursor" / "skills" in roots and userhome / ".gemini" / "config" / "skills" in roots
     assert work / ".agent" / "skills" in roots and work / ".cursor" / "skills" not in roots
     assert roots.index(userhome / ".hermes" / "skills") < roots.index(work / ".claude" / "skills")
+
+
+def test_project_dirs_prefer_codex_current_folder():
+    dirs = agents.PROJECT_SKILL_DIRS
+    assert dirs.index(".agents/skills") < dirs.index(".codex/skills")
+

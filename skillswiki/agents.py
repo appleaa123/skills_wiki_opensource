@@ -13,7 +13,7 @@ from skillswiki import frontmatter
 from skillswiki.errors import SkillsWikiError
 
 # Project-level folders (relative to the working directory). Only these agents read project skills.
-PROJECT_SKILL_DIRS = (".claude/skills", ".codex/skills", ".agents/skills", ".gemini/skills", ".agent/skills")
+PROJECT_SKILL_DIRS = (".claude/skills", ".agents/skills", ".codex/skills", ".gemini/skills", ".agent/skills")
 
 
 @dataclass(frozen=True)
