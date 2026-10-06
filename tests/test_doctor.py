@@ -100,3 +100,38 @@ def test_doctor_survives_unexpected_json_shapes(tmp_home):
         (home / ".claude.json").write_text(json.dumps(config), encoding="utf-8")
         status = doctor.report()["claude_code"]
         assert set(status.values()) <= {"yes", "no", "unreadable"}
+
+
+def test_tables_counts_a_table_with_a_reserved_name(tmp_home):
+    from skillswiki import store
+    with store.connect() as conn:
+        conn.execute('CREATE TABLE "order" (id INTEGER)')
+        conn.execute('INSERT INTO "order" VALUES (1)')
+    assert doctor.report()["db"]["tables"]["order"] == 1
+
+
+def test_two_exports_in_the_same_minute_get_different_files(tmp_home, monkeypatch):
+    from datetime import datetime
+
+    class FrozenDatetime:
+        @staticmethod
+        def now():
+            return datetime(2026, 10, 6, 9, 30, 0)
+    monkeypatch.setattr(doctor, "datetime", FrozenDatetime)
+    first = doctor.export(Path.cwd())
+    second = doctor.export(Path.cwd())
+    assert first != second and first.is_file() and second.is_file()
+
+
+def test_env_keys_survives_undecodable_bytes(tmp_home):
+    env = paths.home() / ".env"
+    env.parent.mkdir(parents=True, exist_ok=True)
+    env.write_bytes(b"GOOD=1\n\xff\xfe=junk\n")
+    assert "GOOD" in doctor._env_keys(env)
+
+
+def test_env_keys_strips_a_leading_export(tmp_home):
+    env = paths.home() / ".env"
+    env.parent.mkdir(parents=True, exist_ok=True)
+    env.write_text("export TYPESAFE_API_KEY=abc\nOTHER=1\n", encoding="utf-8")
+    assert doctor._env_keys(env) == ["OTHER", "TYPESAFE_API_KEY"]

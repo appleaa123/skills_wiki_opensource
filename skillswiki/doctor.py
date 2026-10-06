@@ -22,7 +22,8 @@ def _tables() -> dict:
     with store.connect() as conn:
         names = [r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' "
                                                    "AND name NOT LIKE 'sqlite_%' ORDER BY name")]
-        return {n: conn.execute(f"SELECT COUNT(*) AS n FROM {n}").fetchone()["n"] for n in names}
+        quoted = {n: '"' + n.replace('"', '""') + '"' for n in names}
+        return {n: conn.execute(f"SELECT COUNT(*) AS n FROM {quoted[n]}").fetchone()["n"] for n in names}
 
 
 def _adopted() -> tuple[list[str], list[str]]:
@@ -123,8 +124,8 @@ def _env_keys(env_file: Path) -> list[str]:
     if not env_file.is_file():
         return []
     keys = []
-    for line in env_file.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
+    for line in env_file.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip().removeprefix("export ").strip()
         if line and not line.startswith("#") and "=" in line:
             keys.append(line.split("=", 1)[0].strip())
     return sorted(keys)
@@ -139,9 +140,13 @@ def export(out_dir: Path) -> Path:
             files["skills.json"] = [dict(r) for r in conn.execute("SELECT * FROM skills ORDER BY slug")]
             files["settings.json"] = {r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM settings")}
         files["usage_summary.json"] = usage.counts("")  # every event; counts only, no text
-    path = Path(out_dir) / f"{EXPORT_PREFIX}{datetime.now().strftime('%Y%m%d-%H%M')}.zip"
+    stem = f"{EXPORT_PREFIX}{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    path, n = Path(out_dir) / f"{stem}.zip", 1
+    while path.exists():  # never overwrite an earlier export
+        n += 1
+        path = Path(out_dir) / f"{stem}-{n}.zip"
     manifest = paths.library_dir() / library.MANIFEST_NAME
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(path, "x", zipfile.ZIP_DEFLATED) as zf:  # exclusive: fails rather than overwrites
         for name, data in files.items():
             zf.writestr(name, json.dumps(data, indent=2, default=str))
         if manifest.is_file():

@@ -13,7 +13,10 @@ from skillswiki import frontmatter
 from skillswiki.errors import SkillsWikiError
 
 # Project-level folders (relative to the working directory). Only these agents read project skills.
-PROJECT_SKILL_DIRS = (".claude/skills", ".codex/skills", ".agents/skills", ".gemini/skills", ".agent/skills")
+PROJECT_SKILL_DIRS = (".claude/skills", ".agents/skills", ".codex/skills", ".gemini/skills", ".agent/skills")
+# Project-level readers beyond the agents whose user-level folder has the same name: Antigravity reads
+# <workspace>/.agents/skills (legacy .agent/skills) but has no user-level folder of that name.
+PROJECT_EXTRA_READERS = {".agents/skills": ("antigravity",), ".agent/skills": ("antigravity",)}
 
 
 @dataclass(frozen=True)
@@ -71,9 +74,10 @@ def detected(agent: Agent) -> bool:
 
 
 def _count(folder: Path) -> int:
-    if not folder.is_dir():
+    try:
+        return sum(1 for c in folder.iterdir() if c.is_dir() and (c / frontmatter.SKILL_FILE).is_file())
+    except OSError:  # absent, or not readable by this user: nothing Skills Wiki can count
         return 0
-    return sum(1 for c in folder.iterdir() if c.is_dir() and (c / frontmatter.SKILL_FILE).is_file())
 
 
 def skill_count(agent: Agent) -> int:
@@ -81,8 +85,12 @@ def skill_count(agent: Agent) -> int:
 
 
 def keys_for(path: Path) -> list[str]:
-    """Keys of the agents that read this user-level folder (empty for a folder no agent owns)."""
+    """Keys of the agents that read this user-level or project-level folder (empty for a folder no agent owns)."""
     target = Path(path).resolve()
+    for d in PROJECT_SKILL_DIRS:
+        if (Path.cwd() / d).resolve() == target:
+            readers = [a.key for a in AGENTS if d in a.skills_dirs] + list(PROJECT_EXTRA_READERS.get(d, ()))
+            return [a.key for a in AGENTS if a.key in readers]  # table order
     return [a.key for a in AGENTS if any((Path.home() / d).resolve() == target for d in a.skills_dirs)]
 
 

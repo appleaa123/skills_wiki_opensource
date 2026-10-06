@@ -23,9 +23,11 @@ def test_error_is_a_value_error_with_code_and_details():
     assert errors.as_payload(ValueError("x")) == {"code": "INVALID_INPUT", "message": "x", "details": {}}
 
 
-def test_unknown_code_is_a_programming_error():
-    with pytest.raises(AssertionError):
+def test_unknown_code_is_a_programming_error_even_under_python_O():
+    # LookupError: never a ValueError, so no CLI/MCP/web handler reports a typo in a code as INVALID_INPUT
+    with pytest.raises(LookupError):
         errors.SkillsWikiError("NOPE", "x")
+    assert "assert " not in Path(errors.__file__).read_text(encoding="utf-8")
 
 
 def _code(fn, *args, **kwargs):
