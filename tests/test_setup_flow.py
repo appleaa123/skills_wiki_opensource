@@ -10,6 +10,9 @@ from skillswiki.setup_flow import AUTOMATIC
 @pytest.fixture(autouse=True)
 def no_real_agent_clis(monkeypatch):
     monkeypatch.setattr(wiring, "_which", lambda name: None)  # never run a real `claude mcp add` in tests
+    # never call a real AI CLI for the test request: a fixed paraphrase stands in for it
+    monkeypatch.setattr(setup_flow.paraphrase, "available_backend", lambda: "claude")
+    monkeypatch.setattr(setup_flow.paraphrase, "from_ai", lambda description, backend: "a request in other words")
 
 
 def test_dry_run_explains_everything_and_changes_nothing(tmp_home):
@@ -66,14 +69,15 @@ def test_automatic_wires_every_detected_agent_untested(tmp_home):
     home = two_agents()
     io, said = scripted([])
     result = setup_flow.run(io, mode=AUTOMATIC)
-    assert {o["agent"]: o["test"] for o in result["agents"]} == {"claude_code": "untested", "codex": "untested"}
+    # Claude Code carries our own test result (Phase 12), so automatic mode records it as tested by Skills Wiki
+    assert {o["agent"]: o["test"] for o in result["agents"]} == {"claude_code": "vouched", "codex": "untested"}
     assert claude_hook_commands(home) == ["skillswiki hook --agent claude_code"]
     assert "not tested yet" in said[-1] and "setup --test codex" in said[-1]
 
 
 def test_guided_yes_marks_tested(tmp_home):
     two_agents()
-    io, said = scripted(["g", "y", "y", "y", "y", "y"])  # go; claude: wire, works; codex: wire, works
+    io, said = scripted(["g", "y", "y", "y", "y", "y", "y"])  # go; claude: wire, test anyway, works; codex: wire, works
     result = setup_flow.run(io)
     assert [o["test"] for o in result["agents"]] == ["tested_ok", "tested_ok"]
     assert any("restart it" in s for s in said)
@@ -81,21 +85,32 @@ def test_guided_yes_marks_tested(tmp_home):
 
 def test_failed_hook_falls_back_to_rules_then_advice(tmp_home):
     home = two_agents()
-    # go; claude: hook yes/no-test, rules yes/no-test → advice; codex: wire, works
-    io, said = scripted(["g", "y", "y", "n", "y", "n", "y", "y"])
+    # go; claude: hook yes/test anyway/no, rules yes/no → advice; codex: wire, works
+    io, said = scripted(["g", "y", "y", "y", "n", "y", "n", "y", "y"])
     result = setup_flow.run(io)
     assert result["agents"][0]["method"] == "advice" and wiring.get_row("claude_code")["test"] == "failed"
     assert claude_hook_commands(home) == [] and not (home / ".claude" / "CLAUDE.md").exists()
     assert any("check Skills Wiki" in s for s in said)
 
 
-def test_test_prompt_prefers_a_card_example(tmp_home):
+def test_test_request_prefers_a_card_example_then_an_ai_paraphrase(tmp_home):
     two_agents()
     setup_flow.run(scripted([])[0], mode=AUTOMATIC)
-    # the fixture's quoted YAML description parses without quotes (checked with frontmatter.split, 2026-10-06)
-    assert setup_flow.test_prompt() == ("csv-cleaner", "Help me with this: Cleans messy CSV files: trims, dedupes, normalises dates")
+    io, said = scripted([])
+    assert setup_flow.test_prompt(io) == ("csv-cleaner", "a request in other words")
+    assert any("a few of your tokens" in s for s in said)
     cards.set_manual("email-polisher", ["Polish this email to my landlord"], [], [])
-    assert setup_flow.test_prompt() == ("email-polisher", "Polish this email to my landlord")
+    assert setup_flow.test_prompt(scripted([])[0]) == ("email-polisher", "Polish this email to my landlord")
+
+
+def test_test_request_falls_back_to_what_the_user_types(tmp_home, monkeypatch):
+    two_agents()
+    setup_flow.run(scripted([])[0], mode=AUTOMATIC)
+    monkeypatch.setattr(setup_flow.paraphrase, "from_ai", lambda description, backend: None)
+    io, said = scripted(["tidy up this export, the dates are all over the place"])
+    assert setup_flow.test_prompt(io) == ("csv-cleaner", "tidy up this export, the dates are all over the place")
+    assert any("csv-cleaner" in s for s in said)
+    assert setup_flow.test_prompt(scripted([""])[0]) is None  # nothing typed: no test
 
 
 def test_second_run_adds_nothing(tmp_home):
@@ -152,9 +167,31 @@ def test_one_broken_agent_does_not_stop_the_others(tmp_home, monkeypatch):
 def test_a_failed_agent_is_offered_again_on_the_next_run(tmp_home):
     """Review #5: an agent that ended in advice can be retried."""
     two_agents()
-    setup_flow.run(scripted(["g", "y", "y", "n", "y", "n", "y", "y"])[0])  # claude ends in advice
+    setup_flow.run(scripted(["g", "y", "y", "y", "n", "y", "n", "y", "y"])[0])  # claude ends in advice
     assert wiring.get_row("claude_code")["test"] == "failed"
-    io, _ = scripted(["g", "y", "y", "y"])  # go; claude: wire hook, works
+    io, _ = scripted(["g", "y", "y", "y", "y"])  # go; claude: wire hook, test anyway, works
     result = setup_flow.run(io)
     assert result["agents"][0]["agent"] == "claude_code" and result["agents"][0]["test"] == "tested_ok"
     assert wiring.get_row("claude_code")["method"] == "hook"
+
+
+def test_known_result_makes_the_test_optional(tmp_home):
+    two_agents()
+    io, said = scripted(["g", "y", "y", "n", "y", "y"])  # go; claude: wire, skip test; codex: wire, works
+    result = setup_flow.run(io)
+    assert [o["test"] for o in result["agents"]] == ["vouched", "tested_ok"]
+    assert wiring.get_row("claude_code")["vouched"] == 1
+    assert any("We tested Claude Code" in s for s in said) and "tested by Skills Wiki" in said[-1]
+
+
+def test_automatic_records_the_known_result(tmp_home):
+    two_agents()
+    result = setup_flow.run(scripted([])[0], mode=AUTOMATIC)
+    assert {o["agent"]: o["test"] for o in result["agents"]} == {"claude_code": "vouched", "codex": "untested"}
+
+
+def test_vouched_agents_are_not_asked_again_on_a_rerun(tmp_home):
+    two_agents()
+    setup_flow.run(scripted([])[0], mode=AUTOMATIC)
+    result = setup_flow.run(scripted([])[0], mode=AUTOMATIC)
+    assert [o["agent"] for o in result["agents"]] == ["codex"]

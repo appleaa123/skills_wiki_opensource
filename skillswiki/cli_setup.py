@@ -11,7 +11,7 @@ def _console_ask(question: str, choices: tuple[str, ...]) -> str:
             answer = input(f"{question} ").strip().lower()
         except (EOFError, KeyboardInterrupt) as exc:
             raise Stop("Input ended.") from exc
-        if answer in choices:
+        if not choices or answer in choices:  # no choices: free text (the test request)
             return answer
         print(f"Please answer one of: {', '.join(choices)}")
 

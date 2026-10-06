@@ -73,3 +73,17 @@ def test_wiring_tables_exist_and_check_values(tmp_home):
     with pytest.raises(sqlite3.IntegrityError), store.connect() as conn:
         conn.execute("INSERT INTO wiring (agent, method, self_setup, mcp, test, updated_at) "
                      "VALUES ('cursor', 'magic', 0, 'none', 'untested', 'now')")
+
+
+def test_wiring_table_from_v030_gains_the_vouched_column(tmp_home):
+    import sqlite3
+
+    from skillswiki import paths, store
+    conn = sqlite3.connect(paths.db_path())
+    conn.execute("CREATE TABLE wiring (agent TEXT PRIMARY KEY, method TEXT NOT NULL, self_setup INTEGER NOT NULL "
+                 "DEFAULT 0, mcp TEXT NOT NULL DEFAULT 'none', test TEXT NOT NULL, updated_at TEXT NOT NULL)")
+    conn.execute("INSERT INTO wiring VALUES ('codex', 'hook', 0, 'done', 'untested', 'now')")
+    conn.commit()
+    conn.close()
+    with store.connect() as c:
+        assert c.execute("SELECT vouched FROM wiring WHERE agent = 'codex'").fetchone()["vouched"] == 0

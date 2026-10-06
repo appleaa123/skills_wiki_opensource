@@ -26,7 +26,8 @@ def test_apply_codex_hook_registers_mcp_and_records_untested():
     assert result["state"] == "written" and result["mcp"]["state"] == "done"
     assert _home(".codex/hooks.json").is_file()
     assert wiring.get_row("codex") == {"agent": "codex", "method": "hook", "self_setup": 0, "mcp": "done",
-                                       "test": "untested", "updated_at": wiring.get_row("codex")["updated_at"]}
+                                       "test": "untested", "updated_at": wiring.get_row("codex")["updated_at"],
+                                       "vouched": 0}
     import zipfile
     assert "config/.codex/config.toml" in zipfile.ZipFile(zip_path).namelist()
 

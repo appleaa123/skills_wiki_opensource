@@ -32,6 +32,7 @@ class Wiring:
     rules: Target | None
     mcp: Target | None
     notes: str = ""
+    tested: str = ""  # our own test of the hook (Phase 12): date, version, score; empty = not tested by us
 
 
 def hook_command(agent: str) -> str:
@@ -78,7 +79,9 @@ WIRINGS: tuple[Wiring, ...] = (
                                                   "user", "--", "skillswiki", "serve-mcp"],
                                           "remove": ["claude", "mcp", "remove", MCP_NAME, "--scope", "user"],
                                           "check_file": ".claude.json", "check_key": "mcpServers"},
-                  "https://code.claude.com/docs/en/mcp")),
+                  "https://code.claude.com/docs/en/mcp"),
+           tested="2026-10-06, Claude Code 2.1.291: it loaded the right skill for 4 of 5 requests in its own words "
+                  "(two in Chinese) and none for an unrelated question"),
     Wiring("codex", _json_hook(".codex/hooks.json", ["hooks", "UserPromptSubmit"], "codex",
                                "https://learn.chatgpt.com/docs/hooks"), "claude",
            _md(".codex/AGENTS.md", "https://developers.openai.com/codex/guides/agents-md"),

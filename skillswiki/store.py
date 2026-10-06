@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS wiring (
   self_setup INTEGER NOT NULL DEFAULT 0,          -- 1: the agent edits its own config (D31)
   mcp TEXT NOT NULL DEFAULT 'none' CHECK (mcp IN ('none','done','present','self_setup')),
   test TEXT NOT NULL CHECK (test IN ('tested_ok','untested','failed')),
-  updated_at TEXT NOT NULL);
+  updated_at TEXT NOT NULL,
+  vouched INTEGER NOT NULL DEFAULT 0);             -- 1: the user skipped the test because we tested this agent
 CREATE TABLE IF NOT EXISTS wiring_files (
   path TEXT PRIMARY KEY, created INTEGER NOT NULL,  -- 1: the file did not exist before setup
   original TEXT,                                    -- copy of the pre-setup bytes (NULL when created)
@@ -64,6 +65,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     columns = {r["name"] for r in conn.execute("PRAGMA table_info(skills)")}
     if "copies" not in columns:
         conn.execute("ALTER TABLE skills ADD COLUMN copies TEXT")
+    wiring_columns = {r["name"] for r in conn.execute("PRAGMA table_info(wiring)")}
+    if "vouched" not in wiring_columns:  # databases created by v0.3.0
+        conn.execute("ALTER TABLE wiring ADD COLUMN vouched INTEGER NOT NULL DEFAULT 0")
 
 
 @contextmanager

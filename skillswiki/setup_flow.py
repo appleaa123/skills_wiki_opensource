@@ -4,7 +4,7 @@ import shutil
 from dataclasses import dataclass
 from typing import Callable
 
-from skillswiki import agents, backup, cards, discovery, library, store, wiring, wiring_data
+from skillswiki import agents, backup, cards, discovery, library, paraphrase, store, wiring, wiring_data
 from skillswiki import setup_text as text
 
 GUIDED, AUTOMATIC = "guided", "automatic"
@@ -83,8 +83,9 @@ def _on_path() -> bool:
     return shutil.which("skillswiki") is not None
 
 
-def test_prompt() -> tuple[str, str] | None:
-    """A request one of the user's own adopted skills should answer: a card example first, else a description."""
+def test_prompt(io: Io) -> tuple[str, str] | None:
+    """(slug, request) for the guided test: a routing-card example, else a paraphrase from the user's AI CLI, else a
+    request the user types. Never the description itself: any search matches that word for word."""
     with store.connect() as conn:
         rows = conn.execute("SELECT slug, description FROM skills WHERE status = 'adopted' ORDER BY slug").fetchall()
     for r in rows:
@@ -93,8 +94,16 @@ def test_prompt() -> tuple[str, str] | None:
             return r["slug"], card["examples"][0]
     if not rows:
         return None
-    sentence = rows[0]["description"].split(". ")[0].rstrip(".")
-    return rows[0]["slug"], f"Help me with this: {sentence}"
+    slug, description = rows[0]["slug"], rows[0]["description"]
+    backend = paraphrase.available_backend()
+    if backend:
+        io.say(text.PARAPHRASE_NOTICE.format(backend=backend))
+        request = paraphrase.from_ai(description, backend)
+        if request:
+            return slug, request
+    io.say(text.type_request(slug, description))
+    typed = io.ask(text.ASK_REQUEST, ()).strip()
+    return (slug, typed) if typed else None
 
 
 def guided_test(io: Io, name: str, test: tuple[str, str]) -> str:
@@ -123,6 +132,17 @@ def _outcome(key: str, method: str, test: str) -> dict:
             "self_setup": bool(row.get("self_setup")), "test": test}
 
 
+def _skips_own_test(io: Io, mode: str, key: str, method: str) -> bool:
+    """True when we tested this agent's hook ourselves and the user (or automatic mode) skips their own test."""
+    tested = wiring_data.by_key(key).tested if method == "hook" else ""
+    if not tested:
+        return False
+    if mode == AUTOMATIC:
+        return True
+    io.say(text.known_result(agents.by_key(key).name, tested))
+    return io.ask(text.ASK_TEST_ANYWAY, (YES, NO)) != YES
+
+
 def _apply_step(io: Io, mode: str, key: str, method: str, zip_path) -> bool:
     """Apply one method (asking first in guided mode). False when the user declines this agent."""
     name = agents.by_key(key).name
@@ -145,6 +165,9 @@ def wire_agent(io: Io, mode: str, key: str, zip_path, test, already_applied: boo
         if method == "advice":
             wiring.set_test(key, "failed")
             return _outcome(key, method, "failed")
+        if not already_applied and _skips_own_test(io, mode, key, method):
+            wiring.set_vouched(key)
+            return _outcome(key, method, "vouched")
         if mode == AUTOMATIC or test is None:
             if mode == GUIDED:
                 io.say(text.NO_TEST_SKILL)
@@ -174,16 +197,17 @@ def _wire_safely(io: Io, mode: str, key: str, zip_path, test, already_applied: b
 
 
 def go_live(io: Io, mode: str, keys: list[str], zip_path) -> list[dict]:
-    todo = [k for k in keys if (wiring.get_row(k) or {"test": "untested"})["test"] in ("untested", "failed")]
+    rows = {k: wiring.get_row(k) or {"test": "untested", "vouched": 0} for k in keys}
+    todo = [k for k in keys if rows[k]["test"] in ("untested", "failed") and not rows[k]["vouched"]]
     if todo and not _on_path():
         io.say(text.NOT_ON_PATH)
-    test = test_prompt()
+    test = test_prompt(io) if todo and mode == GUIDED else None
     return [_wire_safely(io, mode, k, zip_path, test) for k in todo]
 
 
 def run_tests(io: Io, which: str) -> list[dict]:
     keys = [r["agent"] for r in wiring.rows()] if which == "all" else [which]
-    test = test_prompt()
+    test = test_prompt(io)
     if test is None:
         io.say(text.NO_TEST_SKILL)
         return []
