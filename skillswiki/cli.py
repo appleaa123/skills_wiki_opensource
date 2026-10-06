@@ -177,6 +177,12 @@ def cmd_config(args) -> None:
     _print({args.key: value}, args.json, f"{args.key} = {value}")
 
 
+def cmd_doctor(args) -> None:
+    from skillswiki import doctor
+    rep = doctor.report()
+    _print(rep, args.json, doctor.human(rep))
+
+
 def cmd_serve_mcp(args) -> None:
     from skillswiki.mcp_server import run
     run()
@@ -267,6 +273,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--port", type=int, default=7878)
     p.add_argument("--no-open", action="store_true", help="don't open a browser")
     p.set_defaults(func=cmd_ui)
+
+    p = sub.add_parser("doctor", help="show what is installed and configured (for bug reports)")
+    p.set_defaults(func=cmd_doctor)
 
     sub.add_parser("serve-mcp", help="run the MCP server over stdio").set_defaults(func=cmd_serve_mcp)
     sub.add_parser("hook", help="Claude Code UserPromptSubmit hook (reads stdin)").set_defaults(func=cmd_hook)

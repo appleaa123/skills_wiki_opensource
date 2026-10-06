@@ -151,3 +151,10 @@ def test_agents_command(tmp_home, capsys):
     _, out, _ = run(capsys, "--json", "agents")
     cursor = next(r for r in json.loads(out) if r["key"] == "cursor")
     assert cursor["detected"] is True and cursor["skills"] == 1
+
+
+def test_doctor_command(tmp_home, capsys):
+    code, out, _ = run(capsys, "doctor")
+    assert code == 0 and "version" in out and "database" in out
+    code, out, _ = run(capsys, "--json", "doctor")
+    assert code == 0 and json.loads(out)["db"]["present"] is False
