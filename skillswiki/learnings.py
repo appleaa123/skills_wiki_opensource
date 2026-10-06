@@ -3,7 +3,9 @@
 Ported from Skills Wiki's hosted product (per-pack there, per-skill here). On by default locally because the
 data never leaves the machine; `skillswiki config set learning off` turns it off.
 """
-from skillswiki import store
+from pathlib import Path
+
+from skillswiki import paths, store
 from skillswiki.errors import SkillsWikiError
 
 LEARNING_MAX_LIVE_PER_SKILL = 8
@@ -135,3 +137,41 @@ def block_for(slug: str) -> str:
         return "\n\n".join(part for part in (block, LEARNING_REMINDER) if part)
     except Exception:
         return ""
+
+
+EXPORT_DIR = "learnings"
+EXPORT_NOTE = ("These are your corrections for this skill. They are also kept in {db}. To keep using them without "
+               "Skills Wiki, paste them into the skill's SKILL.md or your agent's rules file, or ask your agent to "
+               "read this file.")
+
+
+def _slugs_with_live() -> list[str]:
+    with store.connect() as conn:
+        return [r["slug"] for r in conn.execute("SELECT DISTINCT slug FROM learnings WHERE superseded_by IS NULL "
+                                                "AND retired_at IS NULL ORDER BY slug")]
+
+
+def _skill_folder(slug: str) -> str:
+    with store.connect() as conn:
+        row = conn.execute("SELECT path, origin_path FROM skills WHERE slug = ?", (slug,)).fetchone()
+    return (row["origin_path"] or row["path"]) if row else "not installed"
+
+
+def export_markdown(slug: str | None = None) -> list[Path]:
+    """One Markdown file per skill with its current learnings (oldest first) in ~/.skillswiki/learnings/."""
+    if slug is not None and Path(slug).name != slug:
+        raise SkillsWikiError("INVALID_INPUT", f"{slug!r} is not a skill slug", field="slug")
+    written = []
+    for s in [slug] if slug else _slugs_with_live():
+        rows = list(reversed(list_live(s)))
+        if not rows:
+            continue
+        lines = [f"# Learnings for {s}", "", f"Exported {store.now()[:10]}. Skill folder: {_skill_folder(s)}", ""]
+        lines += [f"{i}. {r['body']}" for i, r in enumerate(rows, start=1)]
+        lines += ["", EXPORT_NOTE.format(db=paths.db_path())]
+        out = paths.home() / EXPORT_DIR
+        out.mkdir(parents=True, exist_ok=True)
+        path = out / (s.replace(":", "__") + ".md")
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        written.append(path)
+    return written

@@ -74,3 +74,11 @@ def test_instructions_come_from_the_shipped_skill():
     from skillswiki.mcp_server import INSTRUCTIONS
     assert INSTRUCTIONS == frontmatter.parse_skill(paths.shipped_skill_dir())["body"]
     assert "load_skill" in INSTRUCTIONS and "learning_record" in INSTRUCTIONS
+
+
+def test_learning_list_can_export(tmp_home):
+    from skillswiki import learnings
+    learnings.record("email-polisher", "Keep it short.")
+    result = _call("learning_list", {"slug": "email-polisher", "export": True})
+    assert result["exported_to"].endswith("email-polisher.md")
+    assert "exported_to" not in _call("learning_list", {"slug": "email-polisher"})

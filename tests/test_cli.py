@@ -164,3 +164,16 @@ def test_doctor_export_command(tmp_home, capsys):
     code, out, _ = run(capsys, "doctor", "--export")
     assert code == 0 and "skillswiki-doctor-" in out and "report.json" in out
     assert any(p.name.startswith("skillswiki-doctor-") for p in (tmp_home / "work").iterdir())
+
+
+def test_learn_export(tmp_home, capsys):
+    install_fixture_skills(tmp_home / "native")
+    run(capsys, "scan")
+    run(capsys, "adopt", "email-polisher")
+    run(capsys, "learn", "add", "email-polisher", "Sign off with Best.")
+    code, out, _ = run(capsys, "learn", "export", "email-polisher")
+    assert code == 0 and "email-polisher.md" in out
+    code, out, _ = run(capsys, "learn", "export", "csv-cleaner")
+    assert code == 0 and "No current learnings for csv-cleaner" in out
+    code, _, err = run(capsys, "learn", "add")
+    assert code == 1 and "give a skill slug" in err

@@ -154,6 +154,13 @@ def cmd_enrich(args) -> None:
 
 
 def cmd_learn(args) -> None:
+    if args.action == "export":
+        written = learnings.export_markdown(args.slug)
+        human = ("\n".join(f"Wrote {p}" for p in written) if written
+                 else f"No current learnings{' for ' + args.slug if args.slug else ''}.")
+        return _print({"files": [str(p) for p in written]}, args.json, human)
+    if not args.slug:
+        raise ValueError("give a skill slug")
     if args.action == "add":
         if learnings.enabled():
             learnings.require_adopted(args.slug)
@@ -261,9 +268,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--backend", default="claude", choices=["claude", "codex", "gemini"])
     p.set_defaults(func=cmd_enrich)
 
-    p = sub.add_parser("learn", help="add, list or retire learnings")
-    p.add_argument("action", choices=["add", "list", "retire"])
-    p.add_argument("slug", help="skill slug (for retire: the learning id)")
+    p = sub.add_parser("learn", help="add, list, retire or export learnings")
+    p.add_argument("action", choices=["add", "list", "retire", "export"])
+    p.add_argument("slug", nargs="?", help="skill slug (for retire: the learning id; optional for export)")
     p.add_argument("text", nargs="?", default="")
     p.add_argument("--supersedes", help="comma-separated learning ids this one replaces")
     p.add_argument("--all", action="store_true", help="include superseded and retired learnings")
