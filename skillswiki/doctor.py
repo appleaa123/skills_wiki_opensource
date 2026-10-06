@@ -140,7 +140,12 @@ def export(out_dir: Path) -> Path:
             files["skills.json"] = [dict(r) for r in conn.execute("SELECT * FROM skills ORDER BY slug")]
             files["settings.json"] = {r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM settings")}
         files["usage_summary.json"] = usage.counts("")  # every event; counts only, no text
-    path = Path(out_dir) / f"{EXPORT_PREFIX}{datetime.now().strftime('%Y%m%d-%H%M')}.zip"
+    stem = f"{EXPORT_PREFIX}{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    path = Path(out_dir) / f"{stem}.zip"
+    for n in range(2, 1000):  # never overwrite an earlier export
+        if not path.exists():
+            break
+        path = Path(out_dir) / f"{stem}-{n}.zip"
     manifest = paths.library_dir() / library.MANIFEST_NAME
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
         for name, data in files.items():

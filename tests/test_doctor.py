@@ -108,3 +108,16 @@ def test_tables_counts_a_table_with_a_reserved_name(tmp_home):
         conn.execute('CREATE TABLE "order" (id INTEGER)')
         conn.execute('INSERT INTO "order" VALUES (1)')
     assert doctor.report()["db"]["tables"]["order"] == 1
+
+
+def test_two_exports_in_the_same_minute_get_different_files(tmp_home, monkeypatch):
+    from datetime import datetime
+
+    class FrozenDatetime:
+        @staticmethod
+        def now():
+            return datetime(2026, 10, 6, 9, 30, 0)
+    monkeypatch.setattr(doctor, "datetime", FrozenDatetime)
+    first = doctor.export(Path.cwd())
+    second = doctor.export(Path.cwd())
+    assert first != second and first.is_file() and second.is_file()
