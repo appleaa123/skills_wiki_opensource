@@ -210,6 +210,9 @@ What has been tested, and what to know before relying on it:
 - **Some agents set themselves up.** Where Skills Wiki cannot edit a settings file itself (YAML files such as
   Hermes's or Goose's, Cursor's rules screen, or a file it cannot read), setup gives you a prompt to paste into that
   agent, which shows the change and waits for your approval. Uninstall gives you the matching removal prompt.
+- **Agents started from the Dock or Start menu** may not see your terminal's PATH, so their hook or server can't
+  find the `skillswiki` command. If such an agent fails its test, start it from a terminal and run
+  `skillswiki setup --test <agent>` again.
 - **Codex** reads `~/.codex/AGENTS.override.md` instead of `AGENTS.md` when that file exists, so setup's rules
   line has no effect there; the hook still works.
 

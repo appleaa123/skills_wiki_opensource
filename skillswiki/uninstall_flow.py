@@ -6,7 +6,7 @@ from skillswiki import backup, learnings, library, wiring, wiring_data, wiring_i
 from skillswiki import setup_text as text
 from skillswiki.setup_flow import AUTOMATIC, YES, NO, Io, Stop, confirm
 
-FILE_KINDS = {"json_hook", "json_mcp", "toml_block", "md_block", "own_file"}
+FILE_KINDS = {"json_hook", "json_mcp", "toml_block", "md_block"}
 
 
 def _back_up_agent(zip_path: Path, key: str) -> None:
@@ -19,8 +19,12 @@ def _back_up_agent(zip_path: Path, key: str) -> None:
 def _disconnect(io: Io, zip_path: Path) -> list[dict]:
     removed = []
     for row in wiring.rows():
-        _back_up_agent(zip_path, row["agent"])
-        res = wiring.remove_all(row["agent"])
+        try:
+            _back_up_agent(zip_path, row["agent"])
+            res = wiring.remove_all(row["agent"])
+        except Exception as exc:  # noqa: BLE001 — report this agent and keep disconnecting the others
+            io.say(text.agent_error(row["agent"], exc))
+            continue
         for prompt in (res["method"].get("prompt"), res["mcp"].get("prompt")):
             if prompt:
                 io.say(prompt)
@@ -58,7 +62,7 @@ def run(io: Io, mode: str, dry_run: bool = False, delete_backups: bool = False) 
         if _delete_backups(io, mode, delete_backups):
             result["backups_deleted"] = backup.delete_all()
         io.say(text.uninstall_final())
-    except Stop as exc:
+    except (Stop, KeyboardInterrupt) as exc:
         result["stopped"] = True
-        io.say(text.stopped(str(exc)))
+        io.say(text.stopped(str(exc) or "Interrupted."))
     return result

@@ -31,6 +31,8 @@ DECLINED = "You chose not to continue."
 DRY_RUN_END = "Dry run: nothing was changed. Run `skillswiki setup` to do it."
 NOT_ON_PATH = ("Warning: the `skillswiki` command is not on your PATH, so your agents' hooks can't run it. Run "
                "`pipx ensurepath`, open a new terminal, then run `skillswiki setup` again.")
+GUI_PATH_NOTE = ("Note: an agent you start from the Dock or Start menu may not see your terminal's PATH. If its test "
+                 "fails, start it from a terminal and run `skillswiki setup --test <agent>` again.")
 TRY_NEXT = "Undoing that and trying the next way."
 NO_TEST_SKILL = "There is no adopted skill to test with yet, so testing is skipped. Later: skillswiki setup --test all"
 TEST_CHANGES_FILES = ("If an agent fails its test, I undo its current connection and try the next way, backing up each "
@@ -98,11 +100,15 @@ def mcp_not_registered(name: str, reason: str) -> str:
 
 def test_instructions(name: str, request: str) -> str:
     return (f"Test {name}: restart it (agents read their settings at startup), open a new chat, and send:\n\n"
-            f"    {request}\n\nThen come back here.")
+            f"    {request}\n\nThen come back here. {GUI_PATH_NOTE}")
 
 
 def ask_test(name: str, slug: str) -> str:
     return f"Did {name} check Skills Wiki or use the skill {slug}? [y = yes, n = no, s = skip for now]"
+
+
+def agent_error(name: str, exc: BaseException) -> str:
+    return f"{name}: something went wrong ({exc}). Skipping it; the others continue."
 
 
 def not_connected(key: str) -> str:
@@ -111,6 +117,8 @@ def not_connected(key: str) -> str:
 
 def _status(o: dict) -> str:
     name, way = o["name"], WAYS.get(o["method"], o["method"])
+    if o["method"] == "error":
+        return f"{name}: not connected ({o.get('error', 'error')}). Fix it, then run `skillswiki setup` again."
     if o["method"] == "skipped":
         return f"{name}: skipped; run `skillswiki setup` again to connect it."
     if o["method"] == "advice":

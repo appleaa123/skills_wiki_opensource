@@ -70,9 +70,9 @@ def run(io: Io, mode: str | None = None, dry_run: bool = False) -> dict:
         io.say(text.move_lines(result["moved"], zip_path))
         result["agents"] = go_live(io, mode, keys, zip_path)
         io.say(text.summary(result["agents"], zip_path))
-    except Stop as exc:
+    except (Stop, KeyboardInterrupt) as exc:
         result["stopped"] = True
-        io.say(text.stopped(str(exc)))
+        io.say(text.stopped(str(exc) or "Interrupted."))
     return result
 
 
@@ -137,7 +137,7 @@ def _apply_step(io: Io, mode: str, key: str, method: str, zip_path) -> bool:
 def wire_agent(io: Io, mode: str, key: str, zip_path, test, already_applied: bool = False) -> dict:
     order = wiring.methods(key)
     row = wiring.get_row(key)
-    if row:
+    if row and row["test"] != "failed" and row["method"] in order:  # a failed agent starts over from its hook
         order = order[order.index(row["method"]):]
     for i, method in enumerate(order):
         if not (already_applied and i == 0) and not _apply_step(io, mode, key, method, zip_path):
@@ -160,16 +160,29 @@ def wire_agent(io: Io, mode: str, key: str, zip_path, test, already_applied: boo
     return _outcome(key, order[-1], "failed")
 
 
+def _wire_safely(io: Io, mode: str, key: str, zip_path, test, already_applied: bool = False) -> dict:
+    """One agent's unexpected failure is reported and never stops the others (spec: Errors)."""
+    try:
+        return wire_agent(io, mode, key, zip_path, test, already_applied)
+    except Stop:
+        raise
+    except Exception as exc:  # noqa: BLE001 — a local tool: show the user what failed, keep going
+        name = agents.by_key(key).name
+        io.say(text.agent_error(name, exc))
+        return {"agent": key, "name": name, "method": "error", "self_setup": False, "test": "untested",
+                "error": str(exc)}
+
+
 def go_live(io: Io, mode: str, keys: list[str], zip_path) -> list[dict]:
-    todo = [k for k in keys if (wiring.get_row(k) or {"test": "untested"})["test"] == "untested"]
+    todo = [k for k in keys if (wiring.get_row(k) or {"test": "untested"})["test"] in ("untested", "failed")]
     if todo and not _on_path():
         io.say(text.NOT_ON_PATH)
     test = test_prompt()
-    return [wire_agent(io, mode, k, zip_path, test) for k in todo]
+    return [_wire_safely(io, mode, k, zip_path, test) for k in todo]
 
 
 def run_tests(io: Io, which: str) -> list[dict]:
-    keys = [r["agent"] for r in wiring.rows() if r["method"] != "advice"] if which == "all" else [which]
+    keys = [r["agent"] for r in wiring.rows()] if which == "all" else [which]
     test = test_prompt()
     if test is None:
         io.say(text.NO_TEST_SKILL)
@@ -178,12 +191,13 @@ def run_tests(io: Io, which: str) -> list[dict]:
     results, zip_path = [], None
     try:
         for key in keys:
-            if wiring.get_row(key) is None:
+            row = wiring.get_row(key)
+            if row is None:
                 io.say(text.not_connected(key))
                 continue
             zip_path = zip_path or backup.start("test")
-            results.append(wire_agent(io, GUIDED, key, zip_path, test, already_applied=True))
-    except Stop as exc:
-        io.say(text.stopped(str(exc)))
+            results.append(_wire_safely(io, GUIDED, key, zip_path, test, already_applied=row["test"] != "failed"))
+    except (Stop, KeyboardInterrupt) as exc:
+        io.say(text.stopped(str(exc) or "Interrupted."))
     io.say(text.summary(results, zip_path))
     return results

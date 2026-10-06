@@ -107,8 +107,11 @@ def _claude_style_mcp(t: Target) -> dict:
     exe = _which(t.detail["add"][0])
     if exe is None:
         return {"state": "none", "reason": f"{t.detail['add'][0]} is not on PATH; run: {' '.join(t.detail['add'])}"}
-    proc = subprocess.run([exe, *t.detail["add"][1:]], capture_output=True, text=True, encoding="utf-8",
-                          errors="replace", timeout=CLI_TIMEOUT_S)
+    try:
+        proc = subprocess.run([exe, *t.detail["add"][1:]], capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=CLI_TIMEOUT_S, stdin=subprocess.DEVNULL)
+    except (subprocess.SubprocessError, OSError) as exc:
+        return {"state": "none", "reason": f"{type(exc).__name__}; run it yourself: {' '.join(t.detail['add'])}"}
     return {"state": "done"} if proc.returncode == 0 else {"state": "none", "reason": proc.stderr.strip()[:300]}
 
 
@@ -162,7 +165,16 @@ def undo(key: str, method: str) -> dict:
         return {"state": "none", "prompt": None}
     if t.kind == "self_setup" or (row and row["self_setup"] and row["method"] == method):
         return {"state": "self_setup", "prompt": self_removal_prompt(key, t)}
-    return {"state": wiring_io.remove(t, _user(key, method)), "prompt": None}
+    return _remove_file_part(key, method, t)
+
+
+def _remove_file_part(key: str, slot: str, t: Target) -> dict:
+    """Remove our part from a file; if the file can no longer be read or written, hand the user a removal prompt."""
+    try:
+        return {"state": wiring_io.remove(t, _user(key, slot)), "prompt": None}
+    except (SkillsWikiError, OSError):
+        wiring_io.forget(t, _user(key, slot))
+        return {"state": "self_setup", "prompt": self_removal_prompt(key, t)}
 
 
 def _remove_mcp(key: str, state: str) -> dict:
@@ -175,9 +187,13 @@ def _remove_mcp(key: str, state: str) -> dict:
         exe = _which(t.detail["remove"][0])
         if exe is None:
             return {"state": "self_setup", "prompt": f"Run: {' '.join(t.detail['remove'])}"}
-        subprocess.run([exe, *t.detail["remove"][1:]], capture_output=True, timeout=CLI_TIMEOUT_S)
+        try:
+            subprocess.run([exe, *t.detail["remove"][1:]], capture_output=True, timeout=CLI_TIMEOUT_S,
+                           stdin=subprocess.DEVNULL)
+        except (subprocess.SubprocessError, OSError):
+            return {"state": "self_setup", "prompt": f"Run: {' '.join(t.detail['remove'])}"}
         return {"state": "removed"}
-    return {"state": wiring_io.remove(t, _user(key, "mcp"))}
+    return _remove_file_part(key, "mcp", t)
 
 
 def remove_all(key: str) -> dict:

@@ -57,3 +57,11 @@ def test_self_setup_agents_get_a_removal_prompt(tmp_home):
     io, said = scripted([])
     uninstall_flow.run(io, AUTOMATIC)
     assert any("Hermes Agent" in s and "remove the Skills Wiki entry" in s for s in said)
+
+
+def test_ctrl_c_during_uninstall_stops_cleanly(tmp_home, monkeypatch):
+    set_up()
+    monkeypatch.setattr(uninstall_flow.learnings, "export_markdown",
+                        lambda: (_ for _ in ()).throw(KeyboardInterrupt()))
+    io, said = scripted([])
+    assert uninstall_flow.run(io, AUTOMATIC)["stopped"] and "Stopped" in said[-1]

@@ -100,3 +100,24 @@ def test_set_test_and_rows():
     wiring.apply("warp", "advice")
     wiring.set_test("warp", "failed")
     assert [r["test"] for r in wiring.rows()] == ["failed"]
+
+
+def test_claude_cli_timeout_is_reported_not_raised(monkeypatch):
+    """Review #3: a hanging `claude mcp add` must not crash setup."""
+    monkeypatch.setattr(wiring, "_which", lambda name: f"/bin/{name}")
+
+    def hang(argv, **kw):
+        assert kw.get("stdin") is subprocess.DEVNULL
+        raise subprocess.TimeoutExpired(argv, 60)
+    monkeypatch.setattr(wiring.subprocess, "run", hang)
+    mcp = wiring.apply("claude_code", "rules")["mcp"]
+    assert mcp["state"] == "none" and "claude mcp add" in mcp["reason"]
+
+
+def test_remove_all_survives_a_file_the_user_broke():
+    """Review #3: uninstall gives a removal prompt and drops the row instead of crashing."""
+    wiring.apply("gemini_cli", "hook")
+    _home(".gemini/settings.json").write_text("{ // now with comments\n}", encoding="utf-8")
+    result = wiring.remove_all("gemini_cli")
+    assert result["method"]["state"] == "self_setup" and "remove the Skills Wiki entry" in result["method"]["prompt"]
+    assert wiring.get_row("gemini_cli") is None

@@ -121,3 +121,40 @@ def test_run_tests_later(tmp_home):
     [outcome] = setup_flow.run_tests(io, "codex")
     assert outcome["test"] == "tested_ok" and wiring.get_row("codex")["test"] == "tested_ok"
     assert setup_flow.run_tests(scripted([])[0], "cursor") == []
+
+
+def test_ctrl_c_during_the_move_stops_cleanly(tmp_home, monkeypatch):
+    """Review #3: Ctrl-C outside a question still ends with a stopped summary."""
+    two_agents()
+    monkeypatch.setattr(setup_flow.library, "adopt_all",
+                        lambda **kw: (_ for _ in ()).throw(KeyboardInterrupt()) if not kw.get("dry_run") else
+                        {"adopted": [], "failed": []})
+    io, said = scripted([])
+    assert setup_flow.run(io, mode=AUTOMATIC)["stopped"] and "Stopped" in said[-1]
+
+
+def test_one_broken_agent_does_not_stop_the_others(tmp_home, monkeypatch):
+    """Review #3: an unexpected error is reported for that agent; the rest are still connected."""
+    two_agents()
+    real_apply = wiring.apply
+
+    def flaky(key, method, zip_path=None):
+        if key == "claude_code":
+            raise OSError("disk full")
+        return real_apply(key, method, zip_path)
+    monkeypatch.setattr(setup_flow.wiring, "apply", flaky)
+    io, said = scripted([])
+    result = setup_flow.run(io, mode=AUTOMATIC)
+    assert [o["method"] for o in result["agents"]] == ["error", "hook"]
+    assert any("disk full" in s for s in said)
+
+
+def test_a_failed_agent_is_offered_again_on_the_next_run(tmp_home):
+    """Review #5: an agent that ended in advice can be retried."""
+    two_agents()
+    setup_flow.run(scripted(["g", "y", "y", "n", "y", "n", "y", "y"])[0])  # claude ends in advice
+    assert wiring.get_row("claude_code")["test"] == "failed"
+    io, _ = scripted(["g", "y", "y", "y"])  # go; claude: wire hook, works
+    result = setup_flow.run(io)
+    assert result["agents"][0]["agent"] == "claude_code" and result["agents"][0]["test"] == "tested_ok"
+    assert wiring.get_row("claude_code")["method"] == "hook"

@@ -51,8 +51,8 @@ def _md(path, source):
     return Target(path, "md_block", {}, source)
 
 
-def _own_md(path, source):
-    return Target(path, "own_file", {"content": RULES_TEXT + "\n"}, source)
+def _own_md(path, source):  # a rules file of our own in a rules folder; same marked block, so user notes survive
+    return Target(path, "md_block", {}, source)
 
 
 def _yaml(path, snippet, source):

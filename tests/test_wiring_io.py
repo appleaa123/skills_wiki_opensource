@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from skillswiki import errors, wiring_data, wiring_io
+from skillswiki import errors, paths, wiring_data, wiring_io
 from skillswiki.wiring_data import Target
 
 MD = Target(".gemini/GEMINI.md", "md_block", {}, "https://x")
@@ -113,15 +113,12 @@ def test_opencode_mcp_entry_shape():
     assert data["mcp"]["skillswiki"] == {"type": "local", "command": ["skillswiki", "serve-mcp"]}
 
 
-def test_own_rules_file_is_created_refused_if_different_and_removed():
+def test_own_rules_file_is_created_and_removed():
     rules = wiring_data.by_key("cline").rules
     assert wiring_io.apply(rules, "cline:rules") == "written"
     path = wiring_io.resolve(rules)
-    assert path.read_text(encoding="utf-8") == wiring_data.RULES_TEXT + "\n"
+    assert wiring_data.RULES_TEXT in path.read_text(encoding="utf-8")
     assert wiring_io.remove(rules, "cline:rules") == "deleted" and not path.exists()
-    path.write_text("my own notes", encoding="utf-8")
-    with pytest.raises(errors.SkillsWikiError):
-        wiring_io.apply(rules, "cline:rules")
 
 
 def test_copilot_mcp_entry_shape():
@@ -144,3 +141,50 @@ def test_file_deleted_by_the_user_is_gone_not_recreated():
     wiring_io.apply(MD, "gemini_cli:rules")
     _file(MD.path).unlink()
     assert wiring_io.remove(MD, "gemini_cli:rules") == "gone" and not _file(MD.path).exists()
+
+
+def test_rerun_then_user_edit_survives_uninstall():
+    """Review #1: a second apply must not adopt the user's later edits as ours."""
+    path = _file(HOOK.path)
+    path.parent.mkdir(parents=True)
+    path.write_text('{"theme": "dark"}', encoding="utf-8")
+    wiring_io.apply(HOOK, "codex:hook")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps({**data, "myKey": 1}), encoding="utf-8")
+    assert wiring_io.apply(HOOK, "codex:hook") == "shared"  # setup run again
+    assert wiring_io.remove(HOOK, "codex:hook") == "edited"
+    left = json.loads(path.read_text(encoding="utf-8"))
+    assert left["myKey"] == 1 and "hooks" not in left
+
+
+def test_user_notes_added_to_a_created_rules_file_survive_removal():
+    """Review #2: removal strips only our block from a rules file we created."""
+    rules = wiring_data.by_key("cline").rules
+    wiring_io.apply(rules, "cline:rules")
+    path = wiring_io.resolve(rules)
+    path.write_text(path.read_text(encoding="utf-8") + "\nmy own notes\n", encoding="utf-8")
+    wiring_io.remove(rules, "cline:rules")
+    text = path.read_text(encoding="utf-8")
+    assert "my own notes" in text and wiring_data.RULES_TEXT not in text
+
+
+def test_missing_original_copy_falls_back_to_stripping_our_part():
+    """Review #4: uninstall must not crash when the kept original is gone."""
+    path = _file(MD.path)
+    path.parent.mkdir(parents=True)
+    path.write_text("# mine\n", encoding="utf-8")
+    wiring_io.apply(MD, "gemini_cli:rules")
+    for kept in (paths.home() / wiring_io.ORIGINALS_DIR).iterdir():
+        kept.unlink()
+    assert wiring_io.remove(MD, "gemini_cli:rules") == "edited"
+    assert path.read_text(encoding="utf-8").startswith("# mine") and "skillswiki" not in path.read_text(encoding="utf-8")
+
+
+def test_non_utf8_file_is_never_touched():
+    """Review #3: a latin-1 rules file is reported, not crashed on or rewritten."""
+    path = _file(MD.path)
+    path.parent.mkdir(parents=True)
+    path.write_bytes("# caf\xe9\n".encode("latin-1"))
+    with pytest.raises(errors.SkillsWikiError):
+        wiring_io.apply(MD, "gemini_cli:rules")
+    assert path.read_bytes() == "# caf\xe9\n".encode("latin-1")

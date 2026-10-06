@@ -72,10 +72,12 @@ def _write(path: Path, data: bytes, user: str, part: str) -> None:
     if rec is None:
         created = not path.exists()
         rec = {"created": int(created), "original": None if created else _keep_original(path), "parts": []}
-    if not path.exists() or path.read_bytes() != data:
+    wrote = not path.exists() or path.read_bytes() != data
+    if wrote:
         atomic_write(path, data)
     parts = [p for p in rec["parts"] if p["user"] != user] + [{"user": user, "part": part}]
-    _save(path, rec, _sha(data), parts)
+    # Only a real write changes what we own: re-registering must not adopt the user's later edits as ours.
+    _save(path, rec, _sha(data) if wrote or "written_sha" not in rec else rec["written_sha"], parts)
 
 
 def _put_back(path: Path, rec: dict) -> str:
@@ -91,7 +93,10 @@ def _put_back(path: Path, rec: dict) -> str:
 # --- per-kind content ------------------------------------------------------------------------------------------
 
 def _text(path: Path) -> str:
-    return path.read_text(encoding="utf-8") if path.exists() else ""
+    try:
+        return path.read_text(encoding="utf-8") if path.exists() else ""
+    except UnicodeDecodeError as exc:
+        raise SkillsWikiError("INVALID_INPUT", f"{path} is not UTF-8 text; not editing it", path=str(path)) from exc
 
 
 def _loads(text: str, path: Path) -> dict:
@@ -219,19 +224,9 @@ def _toml_add(text: str, path: Path) -> bytes | None:
     return new.encode("utf-8") if new else None
 
 
-def _own_add(path: Path, d: dict) -> bytes | None:
-    content = d["content"].encode("utf-8")
-    if path.exists():
-        if path.read_bytes() == content:
-            return None
-        raise SkillsWikiError("INVALID_INPUT", f"{path} already exists with other content; not replacing it",
-                              path=str(path))
-    return content
-
-
 def _planned(t: Target, path: Path) -> tuple[bytes | None, str]:
     """(new file bytes, or None when an equal part is already there; the part id)."""
-    text, d = (_text(path) if t.kind != "own_file" else ""), t.detail
+    text, d = _text(path), t.detail
     if t.kind == "json_hook":
         return _hook_add(text, d, path), "hook:" + d["command"]
     if t.kind == "json_mcp":
@@ -241,8 +236,6 @@ def _planned(t: Target, path: Path) -> tuple[bytes | None, str]:
     if t.kind == "md_block":
         new = _block_add(text, MD_BLOCK, MD_BEGIN)
         return (new.encode("utf-8") if new else None), "md"
-    if t.kind == "own_file":
-        return _own_add(path, d), "own"
     raise SkillsWikiError("INVALID_INPUT", f"{t.kind} targets are not files", kind=t.kind)
 
 
@@ -254,9 +247,7 @@ def _stripped(t: Target, current: bytes, path: Path) -> bytes:
         return _mcp_strip(text, t.detail, path)
     if t.kind == "toml_block":
         return _block_strip(text, TOML_BEGIN, TOML_END).encode("utf-8")
-    if t.kind == "md_block":
-        return _block_strip(text, MD_BEGIN, MD_END).encode("utf-8")
-    return b""  # own_file: the whole file is ours
+    return _block_strip(text, MD_BEGIN, MD_END).encode("utf-8")  # md_block
 
 
 # --- public ------------------------------------------------------------------------------------------------------
@@ -270,6 +261,14 @@ def apply(t: Target, user: str) -> str:
         return "present"
     _write(path, new if new is not None else path.read_bytes(), user, part)
     return "written" if new is not None else "shared"
+
+
+def forget(t: Target, user: str) -> None:
+    """Drop `user` from the file's record without touching the file (its part could not be removed)."""
+    path = resolve(t)
+    rec = _record(path)
+    if rec:
+        _save(path, rec, rec["written_sha"], [p for p in rec["parts"] if p["user"] != user])
 
 
 def remove(t: Target, user: str) -> str:
@@ -286,7 +285,8 @@ def remove(t: Target, user: str) -> str:
         _save(path, rec, rec["written_sha"], rest)
         return "kept"
     current = path.read_bytes()
-    if not rest and _sha(current) == rec["written_sha"]:
+    original_kept = rec["created"] or Path(rec["original"]).exists()
+    if not rest and _sha(current) == rec["written_sha"] and original_kept:
         _save(path, rec, rec["written_sha"], [])
         return _put_back(path, rec)
     new = _stripped(t, current, path)
