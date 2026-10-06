@@ -11,6 +11,7 @@ import shutil
 from pathlib import Path
 
 from skillswiki import discovery, paths, store
+from skillswiki.errors import SkillsWikiError
 
 FINGERPRINT_CHARS = 16
 COPIES_DIR = ".copies"  # library/.copies/<slug>/<n>: identical copies adopted along with a skill
@@ -39,7 +40,7 @@ def _row(slug: str) -> dict:
     with store.connect() as conn:
         row = conn.execute("SELECT * FROM skills WHERE slug = ?", (slug,)).fetchone()
     if row is None:
-        raise ValueError(f"skill '{slug}' not found — run: skillswiki scan")
+        raise SkillsWikiError("NOT_FOUND", f"skill '{slug}' not found — run: skillswiki scan", slug=slug)
     return dict(row)
 
 
@@ -114,18 +115,21 @@ def plan_adopt(slug: str) -> dict:
     raises, so a dry run fails the same way the real move would."""
     row = _row(slug)
     if row["status"] == "plugin":
-        raise ValueError(f"'{slug}' is plugin-managed; disable it in your agent's plugin settings instead")
+        raise SkillsWikiError("PLUGIN_MANAGED", f"'{slug}' is plugin-managed; disable it in your agent's plugin "
+                              "settings instead", slug=slug)
     if row["status"] == "adopted":
-        raise ValueError(f"'{slug}' is already adopted")
+        raise SkillsWikiError("ALREADY_ADOPTED", f"'{slug}' is already adopted", slug=slug)
     source = Path(row["path"])
     target = paths.library_dir() / slug
     if not _exists(source):
-        raise ValueError(f"'{slug}' is no longer at {source} — run: skillswiki scan")
+        raise SkillsWikiError("SOURCE_MISSING", f"'{slug}' is no longer at {source} — run: skillswiki scan",
+                              path=str(source))
     if _exists(target):
-        raise ValueError(f"{target} already exists; move or remove it first")
+        raise SkillsWikiError("TARGET_EXISTS", f"{target} already exists; move or remove it first", paths=[str(target)])
     if _is_link(source) and not os.path.isabs(os.readlink(source)):
-        raise ValueError(f"{source} is a relative symlink; moving it would break it. Make the link absolute, or "
-                         f"adopt the folder it points to ({source.resolve()})")
+        raise SkillsWikiError("RELATIVE_SYMLINK", f"{source} is a relative symlink; moving it would break it. "
+                              f"Make the link absolute, or adopt the folder it points to ({source.resolve()})",
+                              path=str(source), target=os.readlink(source))
     digest = fingerprint(source)  # an unreadable file stops us here, with nothing moved
     identical, differing, linked = [], [], []
     others = _other_native_copies(slug, source)
@@ -141,7 +145,8 @@ def plan_adopt(slug: str) -> dict:
         except OSError:
             differing.append(other)
     if identical and _exists(_copies_dir(slug)):
-        raise ValueError(f"{_copies_dir(slug)} already exists; move or remove it first")
+        raise SkillsWikiError("TARGET_EXISTS", f"{_copies_dir(slug)} already exists; move or remove it first",
+                              paths=[str(_copies_dir(slug))])
     return {"slug": slug, "from": str(source), "to": str(target), "fingerprint": digest,
             "moved_copies": [str(o) for o in identical], "other_copies": [str(o) for o in differing + linked],
             "differing_copies": [str(o) for o in differing], "linked_copies": [str(o) for o in linked],
@@ -181,17 +186,18 @@ def plan_release(slug: str) -> dict:
     """Everything release() checks and decides, without touching a file or a row."""
     row = _row(slug)
     if row["status"] != "adopted" or not row["origin_path"]:
-        raise ValueError(f"'{slug}' is not adopted")
+        raise SkillsWikiError("NOT_ADOPTED", f"'{slug}' is not adopted", slug=slug)
     if not _exists(Path(row["path"])):
-        raise ValueError(f"'{slug}' is no longer in the library ({row['path']}); nothing to release — run: "
-                         "skillswiki scan")
+        raise SkillsWikiError("SOURCE_MISSING", f"'{slug}' is no longer in the library ({row['path']}); nothing to "
+                              "release — run: skillswiki scan", path=row["path"])
     copies = json.loads(row["copies"] or "[]")
     missing = [c["origin"] for c in copies if not _exists(Path(c["stored"]))]
     moves = [(Path(row["origin_path"]), Path(row["path"]))]
     moves += [(Path(c["origin"]), Path(c["stored"])) for c in copies if c["origin"] not in missing]
     for origin, _stored in moves:  # check every destination before moving anything
         if _exists(origin):
-            raise ValueError(f"{origin} already exists; move or remove it first")
+            raise SkillsWikiError("TARGET_EXISTS", f"{origin} already exists; move or remove it first",
+                                  paths=[str(origin)])
     return {"slug": slug, "from": str(moves[0][1]), "to": str(moves[0][0]),
             "restored_copies": [str(o) for o, _s in moves[1:]], "missing_copies": missing,
             "moves": [[str(o), str(s)] for o, s in moves]}

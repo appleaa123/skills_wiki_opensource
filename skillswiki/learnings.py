@@ -4,6 +4,7 @@ Ported from Skills Wiki's hosted product (per-pack there, per-skill here). On by
 data never leaves the machine; `skillswiki config set learning off` turns it off.
 """
 from skillswiki import store
+from skillswiki.errors import SkillsWikiError
 
 LEARNING_MAX_LIVE_PER_SKILL = 8
 LEARNING_MAX_BODY_CHARS = 600
@@ -68,17 +69,20 @@ def record(slug: str, body: str, supersedes: list[int] | None = None) -> int:
     Raises ValueError: Learning Mode off, empty/oversized body, or the skill is at the live cap and
     `supersedes` does not free room."""
     if not enabled():
-        raise ValueError(LEARNING_OFF_MESSAGE)
+        raise SkillsWikiError("LEARNING_OFF", LEARNING_OFF_MESSAGE)
     body = (body or "").strip()
     if not body:
-        raise ValueError("body is empty")
+        raise SkillsWikiError("INVALID_INPUT", "body is empty", field="body")
     if len(body) > LEARNING_MAX_BODY_CHARS:
-        raise ValueError(f"body is {len(body)} chars; max {LEARNING_MAX_BODY_CHARS}")
+        raise SkillsWikiError("INVALID_INPUT", f"body is {len(body)} chars; max {LEARNING_MAX_BODY_CHARS}",
+                              field="body")
     supersedes = [int(i) for i in (supersedes or [])]
     live = [r for r in list_live(slug) if r["id"] not in supersedes]
     if len(live) >= LEARNING_MAX_LIVE_PER_SKILL:
-        raise ValueError(
-            f"{slug} already has {LEARNING_MAX_LIVE_PER_SKILL} live learnings — supersede or retire one first")
+        raise SkillsWikiError(
+            "INVALID_INPUT",
+            f"{slug} already has {LEARNING_MAX_LIVE_PER_SKILL} live learnings — supersede or retire one first",
+            field="supersedes")
     with store.connect() as conn:
         new_id = conn.execute("INSERT INTO learnings (slug, body, created_at) VALUES (?, ?, ?)",
                               (slug, body, store.now())).lastrowid
@@ -93,7 +97,7 @@ def _get(learning_id: int) -> dict:
     with store.connect() as conn:
         row = conn.execute("SELECT * FROM learnings WHERE id = ?", (learning_id,)).fetchone()
     if row is None:
-        raise ValueError(f"learning #{learning_id} not found")
+        raise SkillsWikiError("NOT_FOUND", f"learning #{learning_id} not found", id=learning_id)
     return dict(row)
 
 
@@ -114,10 +118,11 @@ def require_adopted(slug: str) -> None:
     with store.connect() as conn:
         row = conn.execute("SELECT status FROM skills WHERE slug = ?", (slug,)).fetchone()
     if row is None:
-        raise ValueError(f"skill '{slug}' not found — check the slug with list_skills / skillswiki list")
+        raise SkillsWikiError("NOT_FOUND", f"skill '{slug}' not found — check the slug with list_skills / "
+                              "skillswiki list", slug=slug)
     if row["status"] != "adopted":
-        raise ValueError(f"skill '{slug}' is not adopted; learnings apply only to skills Skills Wiki loads "
-                         f"(run: skillswiki adopt {slug})")
+        raise SkillsWikiError("NOT_ADOPTED", f"skill '{slug}' is not adopted; learnings apply only to skills Skills "
+                              f"Wiki loads (run: skillswiki adopt {slug})", slug=slug)
 
 
 def block_for(slug: str) -> str:
