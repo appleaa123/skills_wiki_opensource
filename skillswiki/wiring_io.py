@@ -47,17 +47,42 @@ def resolve(t: Target) -> Path:
 def _record(path: Path) -> dict | None:
     with store.connect() as conn:
         row = conn.execute("SELECT * FROM wiring_files WHERE path = ?", (str(path),)).fetchone()
-    return {**dict(row), "parts": json.loads(row["parts"])} if row else None
+    if row is None:
+        return None
+    return {**dict(row), "parts": json.loads(row["parts"]), "made_dirs": json.loads(row["made_dirs"] or "[]")}
+
+
+def _drop(path: Path, rec: dict) -> None:
+    """The last part is gone: forget the file, delete its kept original and any now-empty folders setup created."""
+    with store.connect() as conn:
+        conn.execute("DELETE FROM wiring_files WHERE path = ?", (str(path),))
+    if rec.get("original"):
+        Path(rec["original"]).unlink(missing_ok=True)
+    for folder in rec.get("made_dirs", []):
+        try:
+            Path(folder).rmdir()  # only if empty: never removes anything the user put there
+        except OSError:
+            break
 
 
 def _save(path: Path, rec: dict, written_sha: str, parts: list[dict]) -> None:
+    if not parts:
+        _drop(path, rec)
+        return
     with store.connect() as conn:
-        if not parts:
-            conn.execute("DELETE FROM wiring_files WHERE path = ?", (str(path),))
-            return
-        conn.execute("INSERT INTO wiring_files (path, created, original, written_sha, parts) VALUES (?, ?, ?, ?, ?) "
-                     "ON CONFLICT(path) DO UPDATE SET written_sha = excluded.written_sha, parts = excluded.parts",
-                     (str(path), rec["created"], rec["original"], written_sha, json.dumps(parts)))
+        conn.execute("INSERT INTO wiring_files (path, created, original, written_sha, parts, made_dirs) "
+                     "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(path) DO UPDATE SET written_sha = excluded.written_sha, "
+                     "parts = excluded.parts", (str(path), rec["created"], rec["original"], written_sha,
+                                                json.dumps(parts), json.dumps(rec.get("made_dirs", []))))
+
+
+def _missing_dirs(path: Path) -> list[str]:
+    """Folders that writing `path` will create, deepest first (never the home folder itself)."""
+    missing, folder = [], path.parent
+    while not folder.exists() and folder != Path.home() and folder != folder.parent:
+        missing.append(str(folder))
+        folder = folder.parent
+    return missing
 
 
 def _keep_original(path: Path) -> str:
@@ -71,7 +96,8 @@ def _write(path: Path, data: bytes, user: str, part: str) -> None:
     rec = _record(path)
     if rec is None:
         created = not path.exists()
-        rec = {"created": int(created), "original": None if created else _keep_original(path), "parts": []}
+        rec = {"created": int(created), "original": None if created else _keep_original(path), "parts": [],
+               "made_dirs": _missing_dirs(path) if created else []}
     wrote = not path.exists() or path.read_bytes() != data
     if wrote:
         atomic_write(path, data)
@@ -287,12 +313,13 @@ def remove(t: Target, user: str) -> str:
     current = path.read_bytes()
     original_kept = rec["created"] or Path(rec["original"]).exists()
     if not rest and _sha(current) == rec["written_sha"] and original_kept:
+        outcome = _put_back(path, rec)
         _save(path, rec, rec["written_sha"], [])
-        return _put_back(path, rec)
+        return outcome
     new = _stripped(t, current, path)
     if not rest and rec["created"] and not new.strip():
         path.unlink()
-        _save(path, rec, rec["written_sha"], [])
+        _save(path, rec, rec["written_sha"], [])  # also removes the folders setup created for it
         return "deleted"
     atomic_write(path, new)
     _save(path, rec, _sha(new), rest)

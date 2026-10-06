@@ -45,3 +45,30 @@ def test_available_backend_follows_path(monkeypatch):
     assert paraphrase.available_backend() == "gemini"
     monkeypatch.setattr(paraphrase.shutil, "which", lambda exe: None)
     assert paraphrase.available_backend() is None
+
+
+class ProfileCli(FakeCli):
+    def judge(self, prompt, model, timeout=60, profile=None):
+        self.profile = profile
+        return super().judge(prompt, model, timeout, profile)
+
+
+def test_claude_runs_with_the_lean_profile(monkeypatch):
+    """Cleanup: the paraphrase ran Claude Code with the user's hooks and servers."""
+    cli = ProfileCli("My landlord note sounds stiff, can you soften it?")
+    monkeypatch.setattr(paraphrase, "get_backend", lambda name: cli)
+    paraphrase.from_ai(DESC, "claude")
+    assert "--setting-sources" in cli.profile["flags"]
+    paraphrase.from_ai(DESC, "codex")
+    assert cli.profile is None
+
+
+def test_a_preamble_line_is_not_taken_as_the_request(monkeypatch):
+    cli = FakeCli("Here's one:\n\nMy landlord note sounds stiff, can you soften it?\n")
+    monkeypatch.setattr(paraphrase, "get_backend", lambda name: cli)
+    assert paraphrase.from_ai(DESC, "claude") == "My landlord note sounds stiff, can you soften it?"
+
+
+def test_tests_can_never_reach_a_real_ai_cli():
+    with pytest.raises(AssertionError):
+        paraphrase.from_ai(DESC, "claude")

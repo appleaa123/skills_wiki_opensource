@@ -7,6 +7,7 @@ score halved, so near-miss requests the user explicitly excluded rank lower.
 import json
 import math
 import re
+import unicodedata
 from collections import Counter
 
 from skillswiki import store, usage
@@ -18,7 +19,8 @@ NOT_FOR_MIN_OVERLAP = 2
 NOT_FOR_PENALTY = 0.5
 EXCERPT_MAX_CHARS = 200
 MIN_TOKEN_LEN = 2
-_CJK_CHARS = "\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff"  # kana, CJK, Hangul
+# kana (without the middle dot U+30FB, a separator), CJK, Hangul
+_CJK_CHARS = "\u3040-\u30fa\u30fc-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff"
 _SPLIT = re.compile(rf"[^a-z0-9{_CJK_CHARS}]+")
 _CJK_RUN = re.compile(rf"([{_CJK_CHARS}]+)")
 # Character pairs built on these everyday characters (or listed whole) match almost any Chinese text, so they are not
@@ -30,8 +32,8 @@ a an and are as at be but by can could do for from has have how i if in into is 
 please so that the their them then there these this to us was we what when which will with would you your
 """.split())
 
-NOTE_SHORTLIST = ("Keyword shortlist from the user's adopted skills. If one clearly fits the request, load it with "
-                  "load_skill; otherwise proceed without a skill.")
+NOTE_SHORTLIST = ("Keyword shortlist from the user's adopted skills. Load the top match with load_skill and follow it "
+                  "if it fits; if none fits, answer normally.")
 NOTE_NO_MATCH = "No adopted skill matches this request. Proceed without a skill."
 
 
@@ -54,7 +56,7 @@ def _cjk_pairs(run: str) -> list[str]:
 
 def tokenize(text: str) -> list[str]:
     tokens = []
-    for chunk in _SPLIT.split((text or "").lower()):
+    for chunk in _SPLIT.split(unicodedata.normalize("NFKC", text or "").lower()):  # NFKC: ＡＩ -> AI
         for part in _CJK_RUN.split(chunk):
             if _CJK_RUN.fullmatch(part):
                 tokens += _cjk_pairs(part)

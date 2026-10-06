@@ -200,3 +200,34 @@ def test_block_is_removed_from_a_file_saved_with_crlf_line_endings():
     wiring_io.remove(rules, "cline:rules")
     data = path.read_bytes()
     assert b"my own notes" in data and b"skillswiki" not in data
+
+
+def test_folders_setup_created_are_removed_with_the_file():
+    """Cleanup: uninstall left ~/.cline/rules behind in the live run."""
+    t = Target(".newagent/rules/skillswiki.md", "md_block", {}, "https://x")
+    wiring_io.apply(t, "x:rules")
+    assert wiring_io.remove(t, "x:rules") == "deleted"
+    assert not _file(".newagent").exists()
+
+
+def test_a_folder_that_existed_before_is_kept():
+    _file(".newagent").mkdir()
+    t = Target(".newagent/rules/skillswiki.md", "md_block", {}, "https://x")
+    wiring_io.apply(t, "x:rules")
+    wiring_io.remove(t, "x:rules")
+    assert _file(".newagent").is_dir() and not _file(".newagent/rules").exists()
+
+
+def test_kept_original_is_cleaned_up_on_every_removal_path():
+    """Cleanup: the edited and gone paths left .orig copies behind."""
+    path = _file(MD.path)
+    path.parent.mkdir(parents=True)
+    path.write_text("# mine\n", encoding="utf-8")
+    wiring_io.apply(MD, "gemini_cli:rules")
+    path.write_text(path.read_text(encoding="utf-8") + "user line\n", encoding="utf-8")
+    assert wiring_io.remove(MD, "gemini_cli:rules") == "edited"
+    assert list((paths.home() / wiring_io.ORIGINALS_DIR).iterdir()) == []
+    wiring_io.apply(MD, "gemini_cli:rules")
+    path.unlink()
+    assert wiring_io.remove(MD, "gemini_cli:rules") == "gone"
+    assert list((paths.home() / wiring_io.ORIGINALS_DIR).iterdir()) == []

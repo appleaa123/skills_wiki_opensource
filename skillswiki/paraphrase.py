@@ -1,7 +1,9 @@
 """A realistic request for the guided test. The skill's own description is useless as a test, because any search
 matches it word for word (Phase 12 test run), so setup asks the user's own AI CLI for a paraphrase (a few of the
 user's tokens) and checks that it really uses other words."""
+import json
 import shutil
+from pathlib import Path
 
 from skillswiki.evals.backends import BackendUnavailable, get_backend
 from skillswiki.route import keyword
@@ -30,14 +32,21 @@ def overlap(request: str, description: str) -> float:
 
 def _clean(reply: str) -> str | None:
     lines = [line.strip() for line in (reply or "").strip().splitlines() if line.strip()]
-    text = lines[0].strip("\"'“”「」") if lines else ""
+    text = lines[-1].strip("\"'“”「」") if lines else ""  # the last line: skips a "Here's one:" preamble
     return text if 0 < len(text) <= MAX_CHARS else None
+
+
+def _lean_profile() -> dict | None:
+    """The evals' lean Claude Code invocation: no hooks, MCP servers, tools or saved session (evals/config.json)."""
+    config = json.loads((Path(__file__).parent / "evals" / "config.json").read_text(encoding="utf-8"))
+    return config.get("invocation_profile")
 
 
 def from_ai(description: str, backend: str) -> str | None:
     """A paraphrased request from the user's AI CLI, or None when it fails or mostly repeats the description."""
     try:
-        reply = get_backend(backend).judge(PROMPT.format(description=description), None, timeout=TIMEOUT_S)["text"]
+        reply = get_backend(backend).judge(PROMPT.format(description=description), None, timeout=TIMEOUT_S,
+                                           profile=_lean_profile() if backend == "claude" else None)["text"]
     except (BackendUnavailable, OSError, ValueError, KeyError):
         return None
     text = _clean(reply)

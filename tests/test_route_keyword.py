@@ -104,3 +104,13 @@ def test_everyday_chinese_word_pairs_do_not_match(tmp_home, request_):
     library.adopt("video-ideas")
     assert keyword.shortlist(request_) == []
     assert keyword.shortlist("帮我想想这条短视频从哪个角度切入")[0][0] == "video-ideas"
+
+
+def test_full_width_letters_and_the_middle_dot():
+    assert keyword.tokenize("ＡＩ Ｔｅｓｔ") == ["ai", "test"]
+    assert keyword.tokenize("東京・大阪") == ["東京", "大阪"]
+
+
+def test_server_shortlist_note_matches_the_hook_wording():
+    assert "otherwise proceed without a skill" not in keyword.NOTE_SHORTLIST
+    assert "follow it if it fits" in keyword.NOTE_SHORTLIST

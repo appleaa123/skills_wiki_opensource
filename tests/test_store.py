@@ -87,3 +87,17 @@ def test_wiring_table_from_v030_gains_the_vouched_column(tmp_home):
     conn.close()
     with store.connect() as c:
         assert c.execute("SELECT vouched FROM wiring WHERE agent = 'codex'").fetchone()["vouched"] == 0
+
+
+def test_wiring_files_from_v031_gain_the_made_dirs_column(tmp_home):
+    import sqlite3
+
+    from skillswiki import paths, store
+    conn = sqlite3.connect(paths.db_path())
+    conn.execute("CREATE TABLE wiring_files (path TEXT PRIMARY KEY, created INTEGER NOT NULL, original TEXT, "
+                 "written_sha TEXT NOT NULL, parts TEXT NOT NULL DEFAULT '[]')")
+    conn.execute("INSERT INTO wiring_files VALUES ('/x', 1, NULL, 'abc', '[]')")
+    conn.commit()
+    conn.close()
+    with store.connect() as c:
+        assert c.execute("SELECT made_dirs FROM wiring_files").fetchone()["made_dirs"] == "[]"

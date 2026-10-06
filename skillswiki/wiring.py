@@ -97,13 +97,20 @@ def _apply_target(key: str, slot: str, t: Target, zip_path: Path | None) -> dict
         return {"state": "self_setup", "file": str(path), "prompt": self_setup_prompt(key, t), "reason": str(exc)}
 
 
+def _is_local_server(entry) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    text = " ".join([str(entry.get("command", "")), *(str(a) for a in entry.get("args") or [])])
+    return "skillswiki" in text and "serve-mcp" in text
+
+
 def _claude_style_mcp(t: Target) -> dict:
     try:
         known = wiring_io.load_json(Path.home() / t.detail["check_file"]).get(t.detail["check_key"], {})
     except SkillsWikiError:
         known = {}
-    if MCP_NAME in known:
-        return {"state": "present"}
+    if MCP_NAME in known or any(_is_local_server(v) for v in known.values()):
+        return {"state": "present"}  # also the v0.2 README's `claude mcp add skills-wiki -- skillswiki serve-mcp`
     exe = _which(t.detail["add"][0])
     if exe is None:
         return {"state": "none", "reason": f"{t.detail['add'][0]} is not on PATH; run: {' '.join(t.detail['add'])}"}
@@ -159,12 +166,17 @@ def apply(key: str, method: str, zip_path: Path | None = None) -> dict:
     return result
 
 
-def undo(key: str, method: str) -> dict:
+def undo(key: str, method: str, zip_path: Path | None = None) -> dict:
     t, row = _target(key, method), get_row(key)
     if t is None:
         return {"state": "none", "prompt": None}
     if t.kind == "self_setup" or (row and row["self_setup"] and row["method"] == method):
         return {"state": "self_setup", "prompt": self_removal_prompt(key, t)}
+    if zip_path:
+        try:
+            backup.add_file(zip_path, wiring_io.resolve(t))
+        except (SkillsWikiError, OSError):
+            pass  # a failed backup copy never blocks the undo; the original bytes are also kept by wiring_io
     return _remove_file_part(key, method, t)
 
 

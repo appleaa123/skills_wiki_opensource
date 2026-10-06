@@ -65,7 +65,7 @@ def claude_hook_commands(home: Path) -> list[str]:
     return [h["command"] for g in groups for h in g["hooks"]]
 
 
-def test_automatic_wires_every_detected_agent_untested(tmp_home):
+def test_automatic_wires_every_detected_agent(tmp_home):
     home = two_agents()
     io, said = scripted([])
     result = setup_flow.run(io, mode=AUTOMATIC)
@@ -232,3 +232,23 @@ def test_skipping_a_retest_keeps_the_vouched_mark(tmp_home):
     setup_flow.run(scripted([])[0], mode=AUTOMATIC)
     setup_flow.run_tests(scripted(["s"])[0], "claude_code")
     assert wiring.get_row("claude_code")["vouched"] == 1
+
+
+def test_plan_groups_links_placed_by_another_tool():
+    """Cleanup: the live run printed 14 near-identical warnings."""
+    from skillswiki import setup_text
+    plans = [{"slug": f"cheat-{i}", "from": f"/h/.claude/skills/cheat-{i}", "moved_copies": [], "differing_copies": [],
+              "linked_copies": [], "warnings": [{"code": "FOREIGN_LINK", "path": f"/h/.claude/skills/cheat-{i}",
+                                                 "target": f"/h/proj/skills/cheat-{i}", "message": "long text"}]}
+             for i in range(3)]
+    lines = setup_text.plan_lines({"adopted": plans, "failed": []})
+    assert "long text" not in lines and lines.count("/h/proj/skills") == 1 and "3 of these skills" in lines
+
+
+def test_skipping_the_request_says_testing_was_skipped(tmp_home, monkeypatch):
+    two_agents()
+    setup_flow.run(scripted([])[0], mode=AUTOMATIC)
+    monkeypatch.setattr(setup_flow.paraphrase, "from_ai", lambda description, backend: None)
+    io, said = scripted([""])
+    setup_flow.run_tests(io, "codex")
+    assert any("skipped" in s for s in said) and not any("no adopted skill" in s for s in said)
