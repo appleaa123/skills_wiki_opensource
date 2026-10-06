@@ -71,7 +71,7 @@ def test_claude_mcp_uses_the_claude_cli(monkeypatch):
                         lambda argv, **kw: calls.append(argv) or subprocess.CompletedProcess(argv, 0, "", ""))
     assert wiring.apply("claude_code", "hook")["mcp"]["state"] == "done"
     wiring.remove_all("claude_code")
-    assert calls[0][1:4] == ["mcp", "add", "--scope"] and calls[1][1:3] == ["mcp", "remove"]
+    assert calls[0][1:5] == ["mcp", "add", "--transport", "stdio"] and calls[1][1:4] == ["mcp", "remove", "skillswiki"]
 
 
 def test_claude_mcp_already_present_is_left_alone_on_removal(monkeypatch):

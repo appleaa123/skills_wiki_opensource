@@ -1,9 +1,7 @@
 import json
-import os
 from pathlib import Path
 
 import pytest
-from conftest import posix_permissions
 
 from skillswiki import errors, wiring_data, wiring_io
 from skillswiki.wiring_data import Target
@@ -115,13 +113,21 @@ def test_opencode_mcp_entry_shape():
     assert data["mcp"]["skillswiki"] == {"type": "local", "command": ["skillswiki", "serve-mcp"]}
 
 
-@posix_permissions
-def test_own_file_script_is_executable_and_removed():
-    hook = wiring_data.by_key("cline").hook
-    assert wiring_io.apply(hook, "cline:hook") == "written"
-    path = wiring_io.resolve(hook)
-    assert os.access(path, os.X_OK) and "skillswiki hook --agent cline" in path.read_text(encoding="utf-8")
-    assert wiring_io.remove(hook, "cline:hook") == "deleted"
+def test_own_rules_file_is_created_refused_if_different_and_removed():
+    rules = wiring_data.by_key("cline").rules
+    assert wiring_io.apply(rules, "cline:rules") == "written"
+    path = wiring_io.resolve(rules)
+    assert path.read_text(encoding="utf-8") == wiring_data.RULES_TEXT + "\n"
+    assert wiring_io.remove(rules, "cline:rules") == "deleted" and not path.exists()
+    path.write_text("my own notes", encoding="utf-8")
+    with pytest.raises(errors.SkillsWikiError):
+        wiring_io.apply(rules, "cline:rules")
+
+
+def test_copilot_mcp_entry_shape():
+    wiring_io.apply(wiring_data.by_key("github_copilot").mcp, "github_copilot:mcp")
+    data = json.loads(_file(".copilot/mcp-config.json").read_text(encoding="utf-8"))
+    assert data["mcpServers"]["skillswiki"]["tools"] == ["*"]
 
 
 def test_a_failed_write_leaves_the_original(monkeypatch):

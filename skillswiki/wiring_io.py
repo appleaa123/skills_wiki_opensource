@@ -19,7 +19,8 @@ TOML_BEGIN, TOML_END = "# skillswiki:begin", "# skillswiki:end"
 MD_BLOCK = f"{MD_BEGIN}\n{RULES_TEXT}\n{MD_END}\n"
 TOML_BLOCK = f'{TOML_BEGIN}\n[mcp_servers.{MCP_NAME}]\ncommand = "skillswiki"\nargs = ["serve-mcp"]\n{TOML_END}\n'
 MCP_ENTRIES = {"std": {"command": "skillswiki", "args": ["serve-mcp"]},
-               "opencode": {"type": "local", "command": ["skillswiki", "serve-mcp"]}}
+               "opencode": {"type": "local", "command": ["skillswiki", "serve-mcp"]},
+               "copilot": {"type": "local", "command": "skillswiki", "args": ["serve-mcp"], "tools": ["*"]}}
 
 
 def _sha(data: bytes) -> str:
@@ -38,10 +39,7 @@ def atomic_write(path: Path, data: bytes) -> None:
 
 
 def resolve(t: Target) -> Path:
-    path = Path.home() / t.path
-    if t.kind == "own_file" and os.name == "nt" and t.detail.get("windows_name"):
-        return path.with_name(t.detail["windows_name"])
-    return path
+    return Path.home() / t.path
 
 
 # --- bookkeeping -------------------------------------------------------------------------------------------------
@@ -222,7 +220,7 @@ def _toml_add(text: str, path: Path) -> bytes | None:
 
 
 def _own_add(path: Path, d: dict) -> bytes | None:
-    content = (d.get("windows_content") if os.name == "nt" and d.get("windows_name") else d["content"]).encode()
+    content = d["content"].encode("utf-8")
     if path.exists():
         if path.read_bytes() == content:
             return None
@@ -271,8 +269,6 @@ def apply(t: Target, user: str) -> str:
     if new is None and not ours:
         return "present"
     _write(path, new if new is not None else path.read_bytes(), user, part)
-    if t.kind == "own_file" and t.detail.get("mode") and os.name != "nt":
-        path.chmod(t.detail["mode"])
     return "written" if new is not None else "shared"
 
 

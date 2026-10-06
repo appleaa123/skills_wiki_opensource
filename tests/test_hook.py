@@ -72,20 +72,14 @@ def test_claude_style_agents_get_their_event_name(adopted, agent, event):
     assert data["hookEventName"] == event and "email-polisher" in data["additionalContext"]
 
 
-def test_cline_reads_its_nested_prompt_and_never_cancels(adopted):
-    out = json.loads(hook.respond({"userPromptSubmit": {"prompt": PROMPT}}, "cline"))
-    assert out["cancel"] is False and "email-polisher" in out["contextModification"]
-    assert json.loads(hook.respond({"userPromptSubmit": {"prompt": "hi"}}, "cline")) == {"cancel": False}
-
-
 def test_antigravity_always_gets_the_standing_reminder(adopted):
     out = json.loads(hook.respond({"invocationNum": 3}, "antigravity"))
     assert out == {"injectSteps": [{"ephemeralMessage": wiring_data.RULES_TEXT}]}
 
 
-def test_hermes_and_kiro_formats(adopted):
+def test_hermes_format_reads_top_level_or_extra(adopted):
     assert "email-polisher" in json.loads(hook.respond({"user_message": PROMPT}, "hermes"))["context"]
-    assert hook.respond({"prompt": PROMPT}, "kiro").startswith("Skills Wiki:")
+    assert "email-polisher" in json.loads(hook.respond({"extra": {"user_message": PROMPT}}, "hermes"))["context"]
     assert hook.respond({"user_message": "hi"}, "hermes") == ""
 
 

@@ -26,22 +26,16 @@ def context_line(result: dict) -> str:
 
 
 def _prompt(fmt: str, payload: dict) -> str:
-    if fmt == "cline":
-        return (payload.get("userPromptSubmit") or {}).get("prompt") or ""
-    if fmt == "hermes":
-        return payload.get("user_message") or ""
+    if fmt == "hermes":  # shell hooks may carry it under "extra"
+        return payload.get("user_message") or (payload.get("extra") or {}).get("user_message") or ""
     return payload.get("prompt") or ""
 
 
 def _reply(fmt: str, event: str, line: str) -> str:
-    if fmt == "cline":  # Cline expects a JSON answer every time
-        return json.dumps({"cancel": False, **({"contextModification": line} if line else {})})
     if not line:
         return ""
     if fmt == "hermes":
         return json.dumps({"context": line})
-    if fmt == "plain":
-        return line
     return json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": line}})
 
 
