@@ -67,3 +67,10 @@ def test_errors_carry_codes(tmp_home):
     store.set_setting("learning", "off")
     assert _call("learning_record", {"slug": "x", "body": "y"})["code"] == "LEARNING_OFF"
     assert _call("learning_list", {"slug": "x"})["code"] == "LEARNING_OFF"
+
+
+def test_instructions_come_from_the_shipped_skill():
+    from skillswiki import frontmatter, paths
+    from skillswiki.mcp_server import INSTRUCTIONS
+    assert INSTRUCTIONS == frontmatter.parse_skill(paths.shipped_skill_dir())["body"]
+    assert "load_skill" in INSTRUCTIONS and "learning_record" in INSTRUCTIONS

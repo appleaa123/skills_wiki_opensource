@@ -25,7 +25,8 @@ skillswiki = "skillswiki.cli:main"
 include = ["skillswiki*"]
 
 [tool.setuptools.package-data]
-skillswiki = ["web/static/*", "evals/config.json", "evals/SPEC.md", "evals/templates/*", "evals/prompts/*"]
+skillswiki = ["web/static/*", "evals/config.json", "evals/SPEC.md", "evals/templates/*", "evals/prompts/*",
+              "assets/skills/skills-wiki/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

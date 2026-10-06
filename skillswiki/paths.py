@@ -51,6 +51,14 @@ def package_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
+SHIPPED_SKILL_SLUG = "skills-wiki"
+
+
+def shipped_skill_dir() -> Path:
+    """The skill that teaches an agent to ask Skills Wiki; shipped inside the package, installed by `setup`."""
+    return package_dir() / "assets" / "skills" / SHIPPED_SKILL_SLUG
+
+
 def scan_roots() -> list[Path]:
     """Native skill roots: every registry agent's user-level folders (agents.AGENTS, in table order), then the
     project-level folders (agents.PROJECT_SKILL_DIRS) under the working directory, then SKILLSWIKI_SCAN_ROOTS extras

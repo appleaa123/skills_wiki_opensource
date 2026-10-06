@@ -59,3 +59,10 @@ def test_hash_inside_quotes_is_kept():
 def test_plain_multiline_scalar_is_joined():
     fm, _ = frontmatter.split("---\ndescription: Turns notes\n  into a plan\n  with owners.\nname: x\n---\n")
     assert fm == {"description": "Turns notes into a plan with owners.", "name": "x"}
+
+
+def test_shipped_skill_parses():
+    from skillswiki import paths
+    skill = frontmatter.parse_skill(paths.shipped_skill_dir())
+    assert skill["slug"] == "skills-wiki" and skill["name"] == "skills-wiki"
+    assert "Skills Wiki" in skill["description"] and "suggest_skill" in skill["body"]

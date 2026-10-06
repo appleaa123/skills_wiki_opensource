@@ -119,6 +119,9 @@ def plan_adopt(slug: str) -> dict:
                               "settings instead", slug=slug)
     if row["status"] == "adopted":
         raise SkillsWikiError("ALREADY_ADOPTED", f"'{slug}' is already adopted", slug=slug)
+    if slug == paths.SHIPPED_SKILL_SLUG:
+        raise SkillsWikiError("RESERVED", f"'{slug}' is the Skills Wiki skill itself; adopting it would hide it "
+                              "from your agent", slug=slug)
     source = Path(row["path"])
     target = paths.library_dir() / slug
     if not _exists(source):

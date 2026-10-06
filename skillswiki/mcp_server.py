@@ -5,18 +5,11 @@ user has 5 skills or 500.
 """
 from fastmcp import FastMCP
 
-from skillswiki import errors, learnings, loader, paths, store
+from skillswiki import errors, frontmatter, learnings, loader, paths, store
 from skillswiki.route import suggest
 
-INSTRUCTIONS = (
-    "Skills Wiki manages the AI skills this user installed. Before a task that may need a specialised, documented "
-    "procedure (writing in a set style, a domain workflow, a file-processing routine), call suggest_skill with the "
-    "user's request. If it returns a skill, load it with load_skill and follow it. If it returns a shortlist, pick "
-    "one that clearly fits and load it, or proceed without a skill. load_skill returns the skill's folder on disk: "
-    "read or run its files from there. If the user corrects how a skill is applied, or asks you to remember "
-    "something specific to a skill, record it with learning_record (call learning_list first). If Learning Mode is "
-    "off, tell the user they can turn it on with: skillswiki config set learning on"
-)
+# One text for the MCP instructions and the shipped skill, so they never drift.
+INSTRUCTIONS = frontmatter.parse_skill(paths.shipped_skill_dir())["body"]
 
 mcp = FastMCP("skills-wiki", instructions=INSTRUCTIONS)
 

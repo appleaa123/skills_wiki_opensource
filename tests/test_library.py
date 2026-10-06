@@ -421,3 +421,13 @@ def test_link_into_a_scanned_root_is_not_foreign(tmp_home):
 
 def test_plain_folder_is_never_foreign(native):
     assert library.plan_adopt("email-polisher")["warnings"] == []
+
+
+def test_shipped_skill_cannot_be_adopted(tmp_home):
+    import shutil
+    shutil.copytree(paths.shipped_skill_dir(), tmp_home / "native" / "skills-wiki")
+    discovery.sync_db()
+    assert _row("skills-wiki")["status"] == "native"
+    with pytest.raises(ValueError, match="hide it from your agent") as info:
+        library.plan_adopt("skills-wiki")
+    assert info.value.code == "RESERVED"
