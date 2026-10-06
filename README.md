@@ -13,7 +13,7 @@ requests, checks your test suites and grades through a cascade. Without a key, e
 
 Works with skills for **Claude Code, Codex and Antigravity** (folders containing a `SKILL.md`).
 
-> **Beta (v0.1).** Needs Python 3.11–3.13. Adopting a skill moves its folder, so **back up your skills folders
+> **Beta (v0.2).** Needs Python 3.11–3.13. Adopting a skill moves its folder, so **back up your skills folders
 > first** (the folders `skillswiki agents` lists, such as `~/.claude/skills` and `~/.agents/skills`). See
 > [Status and limits](#status-and-limits) before you rely on it.
 
@@ -175,6 +175,23 @@ What has been tested, and what to know before relying on it:
 - **The JEV grading cascade** had not yet made a final grade in a live run when this was written (0 of 468).
   Generated suites now tag criterion kinds so it can earn trust on style criteria; that has not been confirmed live.
 - **Python** 3.11, 3.12 and 3.13 are tested in CI.
+- **`adopt --dry-run` and `release --dry-run`** show every folder that would move, without moving anything. The
+  real command can still fail afterwards if a folder changes in between; it then puts everything back.
+- **Skills placed by another tool.** If a skill in an agent's folder is a link to somewhere Skills Wiki does not
+  scan (for example skills-manager's library), `adopt` warns that the other tool may put it back, and proceeds.
+  Undeploy it there first if you use both tools.
+- **Scanned folders.** `skillswiki agents` lists the 21 agents whose folders are scanned. Only Claude Code, Codex
+  (tests) and Antigravity (MCP) have been exercised; the other paths come from their docs and from skills-manager's
+  table. Antigravity reads `~/.gemini/config/skills` (2.0), `~/.gemini/antigravity-cli/skills` (CLI) or the older
+  `~/.gemini/antigravity/skills`; `~/.gemini/skills` is Gemini CLI's.
+- **The `skills-wiki` skill** ships inside the package (find it with
+  `python -c "from skillswiki import paths; print(paths.shipped_skill_dir())"`) and its text is what the MCP server
+  tells agents. Copying it into an agent's skills folder did not help in our test (2026-10-06, five prompts, five
+  adopted skills, one run each): Claude Code asked Skills Wiki on 2 of 5 prompts with the skill and 2 of 5
+  without; Antigravity on 0 of 5 either way. So there is no setup command for it; use the Claude Code hook.
+- **`skillswiki doctor --export`** writes a zip for bug reports: versions, paths, table sizes, agent and config
+  detection, usage counts, the names (not values) of keys in `.env`, and `RESTORE.json`. It never includes your
+  prompts, learnings, eval outputs or skill files.
 
 ## Uninstall
 

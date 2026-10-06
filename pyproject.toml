@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skillswiki"
-version = "0.1.3"
+version = "0.2.0"
 description = "Manage the AI skills you already installed: routing, learnings, evals and benchmarks, all local."
 readme = "README.md"
 license = {file = "LICENSE"}

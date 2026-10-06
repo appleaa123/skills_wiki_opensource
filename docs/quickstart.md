@@ -73,6 +73,8 @@ blocks your prompt.
 skillswiki suggest "fix my email draft"
 skillswiki load <slug>
 skillswiki learn add <slug> "Always sign off with 'Best'."
+skillswiki adopt <slug> --dry-run   # preview what would move
+skillswiki doctor                   # check the install; --export writes a zip for bug reports
 ```
 
 If keyword matching misses requests you expect to match, give the skill a routing card:
