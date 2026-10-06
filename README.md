@@ -14,7 +14,7 @@ requests, checks your test suites and grades through a cascade. Without a key, e
 Works with skills for **Claude Code, Codex and Antigravity** (folders containing a `SKILL.md`).
 
 > **Beta (v0.1).** Needs Python 3.11–3.13. Adopting a skill moves its folder, so **back up your skills folders
-> first** (`~/.claude/skills`, `~/.agents/skills`, `~/.gemini/skills`, `~/.codex/skills`). See
+> first** (the folders `skillswiki agents` lists, such as `~/.claude/skills` and `~/.agents/skills`). See
 > [Status and limits](#status-and-limits) before you rely on it.
 
 ## Quickstart

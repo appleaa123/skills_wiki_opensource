@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 
-from skillswiki import cards, discovery, errors, learnings, library, loader, paths, store
+from skillswiki import agents, cards, discovery, errors, learnings, library, loader, paths, store
 from skillswiki.route import suggest
 
 CONFIG_KEYS = {"learning": ("on", "off")}
@@ -62,6 +62,13 @@ def _adopt_lines(result: dict, dry_run: bool) -> str:
     for warning in result.get("warnings", []):
         human += f"\n  warning: {warning['message']}"
     return human
+
+
+def cmd_agents(args) -> None:
+    rows = agents.rows()
+    human = "\n".join(f"{r['key']:16} {r['name']:20} {'detected' if r['detected'] else '-':8} "
+                      f"{r['skills']:3} skill{'s' if r['skills'] != 1 else ''}" for r in rows)
+    _print(rows, args.json, human)
 
 
 def cmd_adopt(args) -> None:
@@ -210,6 +217,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("list", help="list known skills")
     p.add_argument("--status", choices=["adopted", "native", "plugin"])
     p.set_defaults(func=cmd_list)
+    sub.add_parser("agents", help="list the agents whose skill folders are scanned").set_defaults(func=cmd_agents)
     p = sub.add_parser("adopt", help="move a skill into the Skills Wiki library")
     p.add_argument("slug")
     p.add_argument("--dry-run", dest="dry_run", action="store_true", help="show what would move; move nothing")

@@ -94,3 +94,14 @@ def test_windows_ignores_the_executable_bit(tmp_home, monkeypatch):
     assert discovery.has_scripts(native / "email-polisher") is False
     (native / "email-polisher" / "setup.bat").write_text("@echo off")
     assert discovery.has_scripts(native / "email-polisher") is True
+
+
+def test_scan_json_lists_existing_roots_with_agents(tmp_home):
+    install_fixture_skills(tmp_home / "userhome" / ".agents" / "skills", ["email-polisher"])
+    install_fixture_skills(tmp_home / "native", ["meeting-notes"])  # SKILLSWIKI_SCAN_ROOTS extra: no agent owns it
+    roots = {r["path"]: r["agents"] for r in discovery.scan()["roots"]}
+    assert roots[str(tmp_home / "userhome" / ".agents" / "skills")] == ["codex", "gemini_cli", "github_copilot",
+                                                                         "cline", "warp"]
+    assert roots[str(tmp_home / "native")] == []
+    assert str(tmp_home / "userhome" / ".cursor" / "skills") not in roots  # does not exist on disk
+    assert "roots" in discovery.sync_db()

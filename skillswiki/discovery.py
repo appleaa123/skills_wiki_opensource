@@ -9,7 +9,7 @@ import json
 import os
 from pathlib import Path
 
-from skillswiki import frontmatter, paths, store
+from skillswiki import agents, frontmatter, paths, store
 
 SCRIPT_SUFFIXES = frozenset({".py", ".sh", ".js", ".ts", ".rb", ".pl", ".ps1", ".psm1", ".bash", ".zsh",
                              ".bat", ".cmd", ".exe"})
@@ -67,10 +67,14 @@ def _plugin_skills() -> list[tuple[str, Path]]:
 
 
 def scan() -> dict:
-    """{"skills": [entry], "conflicts": [{"slug", "path", "kept"}]}."""
+    """{"skills": [entry], "conflicts": [{"slug", "path", "kept"}], "roots": [{"path", "agents"}]} — roots lists
+    only the native folders that exist on disk, with the registry keys of the agents that read each one."""
     candidates = [(d, "adopted", None) for d in _skill_dirs(paths.library_dir())]
+    roots = []
     for root in paths.scan_roots():
         candidates += [(d, "native", None) for d in _skill_dirs(root)]
+        if root.is_dir():
+            roots.append({"path": str(root), "agents": agents.keys_for(root)})
     candidates += [(d, "plugin", slug) for slug, d in _plugin_skills()]
 
     skills, conflicts, seen = [], [], {}
@@ -84,7 +88,7 @@ def scan() -> dict:
             continue
         seen[entry["slug"]] = entry["path"]
         skills.append(entry)
-    return {"skills": skills, "conflicts": conflicts}
+    return {"skills": skills, "conflicts": conflicts, "roots": roots}
 
 
 def sync_db() -> dict:
@@ -93,7 +97,7 @@ def sync_db() -> dict:
     result = scan()
     found = {s["slug"]: s for s in result["skills"]}
     report = {"added": [], "updated": [], "removed": [], "missing": [], "conflicts": result["conflicts"],
-              "total": len(found)}
+              "roots": result["roots"], "total": len(found)}
     ts = store.now()
     with store.connect() as conn:
         existing = {r["slug"]: dict(r) for r in conn.execute("SELECT * FROM skills")}

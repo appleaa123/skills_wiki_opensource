@@ -142,3 +142,12 @@ def test_json_error_shape_for_bare_value_error(tmp_home, capsys):
     code, _, err = run(capsys, "--json", "release")
     assert code == 1 and json.loads(err) == {"ok": False, "code": "INVALID_INPUT",
                                              "message": "give a skill slug or --all", "details": {}}
+
+
+def test_agents_command(tmp_home, capsys):
+    install_fixture_skills(tmp_home / "userhome" / ".cursor" / "skills", ["email-polisher"])
+    code, out, _ = run(capsys, "agents")
+    assert code == 0 and "claude_code" in out and "Cursor" in out
+    _, out, _ = run(capsys, "--json", "agents")
+    cursor = next(r for r in json.loads(out) if r["key"] == "cursor")
+    assert cursor["detected"] is True and cursor["skills"] == 1
