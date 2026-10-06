@@ -6,16 +6,13 @@ redirect it with SKILLSWIKI_HOME / SKILLSWIKI_SCAN_ROOTS.
 import os
 from pathlib import Path
 
+from skillswiki import agents
+
 HOME_ENV = "SKILLSWIKI_HOME"
 SCAN_ROOTS_ENV = "SKILLSWIKI_SCAN_ROOTS"
 DEFAULT_HOME_NAME = ".skillswiki"
 DB_NAME = "skillswiki.db"
 ENV_FILE_NAME = ".env"
-
-# Skill folders agents read natively (Claude Code; Codex, legacy and current; Gemini CLI). User-level first,
-# then the same names under the current working directory (project-level).
-AGENT_SKILL_DIRS = (".claude/skills", ".codex/skills", ".agents/skills", ".gemini/skills")
-
 
 def home() -> Path:
     raw = os.getenv(HOME_ENV, "").strip()
@@ -55,11 +52,12 @@ def package_dir() -> Path:
 
 
 def scan_roots() -> list[Path]:
-    """Native skill roots, user-level then project-level then SKILLSWIKI_SCAN_ROOTS extras (separated by ':' on
-    macOS/Linux, ';' on Windows — os.pathsep). Missing
-    directories are kept (callers skip them); duplicates (by resolved path) are dropped."""
-    candidates = [Path.home() / d for d in AGENT_SKILL_DIRS]
-    candidates += [Path.cwd() / d for d in AGENT_SKILL_DIRS]
+    """Native skill roots: every registry agent's user-level folders (agents.AGENTS, in table order), then the
+    project-level folders (agents.PROJECT_SKILL_DIRS) under the working directory, then SKILLSWIKI_SCAN_ROOTS extras
+    (separated by ':' on macOS/Linux, ';' on Windows — os.pathsep). Missing directories are kept (callers skip
+    them); duplicates (by resolved path) are dropped."""
+    candidates = [Path.home() / d for d in agents.user_skill_dirs()]
+    candidates += [Path.cwd() / d for d in agents.PROJECT_SKILL_DIRS]
     extra = os.getenv(SCAN_ROOTS_ENV, "")
     candidates += [Path(p).expanduser().absolute() for p in extra.split(os.pathsep) if p.strip()]
     roots, seen = [], set()
