@@ -319,7 +319,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_doctor)
 
     sub.add_parser("serve-mcp", help="run the MCP server over stdio").set_defaults(func=cmd_serve_mcp)
-    sub.add_parser("hook", help="Claude Code UserPromptSubmit hook (reads stdin)").set_defaults(func=cmd_hook)
+    p = sub.add_parser("hook", help="per-prompt hook for your agents (reads stdin; --agent KEY)")
+    p.add_argument("--agent", default="claude_code")
+    p.set_defaults(func=cmd_hook)
     return parser
 
 
@@ -337,7 +339,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["hook"]:  # runs on every prompt: never print a traceback, always exit 0
         from skillswiki import hook
-        hook.main()
+        hook.main(argv[1:])
         return 0
     args = build_parser().parse_args(argv)
     try:
