@@ -5,27 +5,25 @@ user has 5 skills or 500.
 """
 from fastmcp import FastMCP
 
-from skillswiki import learnings, loader, paths, store
+from skillswiki import errors, frontmatter, learnings, loader, paths, store
 from skillswiki.route import suggest
 
-INSTRUCTIONS = (
-    "Skills Wiki manages the AI skills this user installed. Before a task that may need a specialised, documented "
-    "procedure (writing in a set style, a domain workflow, a file-processing routine), call suggest_skill with the "
-    "user's request. If it returns a skill, load it with load_skill and follow it. If it returns a shortlist, pick "
-    "one that clearly fits and load it, or proceed without a skill. load_skill returns the skill's folder on disk: "
-    "read or run its files from there. If the user corrects how a skill is applied, or asks you to remember "
-    "something specific to a skill, record it with learning_record (call learning_list first). If Learning Mode is "
-    "off, tell the user they can turn it on with: skillswiki config set learning on"
-)
+# One text for the MCP instructions and the shipped skill, so they never drift.
+INSTRUCTIONS = frontmatter.parse_skill(paths.shipped_skill_dir())["body"]
 
 mcp = FastMCP("skills-wiki", instructions=INSTRUCTIONS)
+
+
+def _fail(exc: BaseException) -> dict:
+    payload = errors.as_payload(exc)
+    return {"error": payload["message"], "code": payload["code"], "details": payload["details"]}
 
 
 def _guard(fn, *args, **kwargs) -> dict:
     try:
         return fn(*args, **kwargs)
     except ValueError as exc:
-        return {"error": str(exc)}
+        return _fail(exc)
 
 
 @mcp.tool
@@ -71,7 +69,7 @@ def learning_record(slug: str, body: str, supersedes: list[int] | None = None) -
         supersedes: Optional ids (from learning_list or [#id] markers in a loaded skill) this one replaces.
     """
     if not learnings.enabled():
-        return {"error": learnings.LEARNING_OFF_MESSAGE}
+        return _fail(errors.SkillsWikiError("LEARNING_OFF", learnings.LEARNING_OFF_MESSAGE))
     problem = _guard(learnings.require_adopted, slug)
     if problem:
         return problem
@@ -84,7 +82,7 @@ def learning_list(slug: str) -> dict:
     """List the user's live learnings for one skill — call before learning_record to avoid near-duplicates and
     to find ids to supersede. Returns {"learnings": [{id, slug, body, created_at}]} or {"error": str}."""
     if not learnings.enabled():
-        return {"error": learnings.LEARNING_OFF_MESSAGE}
+        return _fail(errors.SkillsWikiError("LEARNING_OFF", learnings.LEARNING_OFF_MESSAGE))
     rows = learnings.list_live(slug)
     return {"learnings": [{k: r[k] for k in ("id", "slug", "body", "created_at")} for r in rows]}
 

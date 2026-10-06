@@ -6,6 +6,7 @@ import sys
 from datetime import datetime, timezone
 
 from skillswiki import learnings, paths
+from skillswiki.errors import SkillsWikiError
 from skillswiki.evals import ratchet_local, suite
 
 BACKENDS = ["claude", "codex", "gemini"]
@@ -60,6 +61,7 @@ def _unique_result_path(slug: str):
 
 def cmd_run(args) -> None:
     from skillswiki.evals import runner
+    from skillswiki.evals.backends import BackendUnavailable
 
     config = load_config()
     arms, runs = _arms_runs(args, config)
@@ -83,6 +85,8 @@ def cmd_run(args) -> None:
             judge_model=args.judge_model, runs=runs, arms=arms, config=config, concurrency=args.concurrency,
             tier=args.tier, allow_large=args.allow_large, cache_baseline=args.tier is not None,
             learnings_block=block, learnings_meta=meta, cascade=args.cascade)
+    except BackendUnavailable as exc:
+        raise SkillsWikiError("BACKEND_UNAVAILABLE", str(exc), backend=args.executor) from exc
     except (runner.BudgetExceeded, runner.NoIndependentJudgeAvailable, FileNotFoundError) as exc:
         raise ValueError(str(exc)) from exc
     out = _unique_result_path(args.slug)
@@ -175,7 +179,9 @@ def cmd_generate(args) -> None:
         print(f"Asking {args.backend} to draft an eval suite for {args.slug} (uses your own AI tokens)...",
               file=sys.stderr)
         result = generator.generate(args.slug, args.backend, overwrite=args.overwrite)
-    except (BackendUnavailable, RuntimeError) as exc:
+    except BackendUnavailable as exc:
+        raise SkillsWikiError("BACKEND_UNAVAILABLE", str(exc), backend=args.backend) from exc
+    except RuntimeError as exc:
         raise ValueError(str(exc)) from exc
     if args.json:
         print(json.dumps(result))
@@ -195,7 +201,9 @@ def cmd_check(args) -> None:
 
     try:
         result = suite_check.check(args.slug, llm=args.llm, backend=args.backend)
-    except (BackendUnavailable, RuntimeError) as exc:
+    except BackendUnavailable as exc:
+        raise SkillsWikiError("BACKEND_UNAVAILABLE", str(exc), backend=args.backend) from exc
+    except RuntimeError as exc:
         raise ValueError(str(exc)) from exc
     if args.json:
         print(json.dumps(result, indent=2))

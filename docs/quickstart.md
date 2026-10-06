@@ -12,7 +12,7 @@ Install it so your AI agent can find the `skillswiki` command (a virtualenv is n
 pipx install git+https://github.com/appleaa123/skills_wiki_opensource.git
 ```
 
-Back up your skills folders first (`~/.claude/skills`, `~/.agents/skills`, `~/.gemini/skills`, `~/.codex/skills`):
+Back up your skills folders first (run `skillswiki agents` to see them, e.g. `~/.claude/skills`, `~/.agents/skills`):
 adopting a skill moves its folder.
 
 Or from a clone: `pipx install .` — or use the absolute path of the console script, e.g.
@@ -28,9 +28,10 @@ mkdir -p ~/.skillswiki && cp .env.example ~/.skillswiki/.env   # then edit it
 ## 2. Find and adopt your skills
 
 ```bash
-skillswiki scan                 # finds skills in ~/.claude/skills, ~/.codex/skills, ~/.agents/skills, ~/.gemini/skills
-                                # and the same folders under your current project
+skillswiki scan                 # finds skills in every agent's folder (skillswiki agents lists them)
+                                # and in .claude/.codex/.agents/.gemini/.agent skills folders under your project
 skillswiki list
+skillswiki agents               # which agents are installed here and how many skills each has
 skillswiki adopt <slug>         # moves the skill into ~/.skillswiki/library — your agent stops auto-triggering it
 skillswiki release <slug>       # moves it back, byte-for-byte
 skillswiki release --all        # moves every adopted skill back (do this before uninstalling)
@@ -72,6 +73,8 @@ blocks your prompt.
 skillswiki suggest "fix my email draft"
 skillswiki load <slug>
 skillswiki learn add <slug> "Always sign off with 'Best'."
+skillswiki adopt <slug> --dry-run   # preview what would move
+skillswiki doctor                   # check the install; --export writes a zip for bug reports
 ```
 
 If keyword matching misses requests you expect to match, give the skill a routing card:

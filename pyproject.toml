@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skillswiki"
-version = "0.1.3"
+version = "0.2.0"
 description = "Manage the AI skills you already installed: routing, learnings, evals and benchmarks, all local."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -25,7 +25,8 @@ skillswiki = "skillswiki.cli:main"
 include = ["skillswiki*"]
 
 [tool.setuptools.package-data]
-skillswiki = ["web/static/*", "evals/config.json", "evals/SPEC.md", "evals/templates/*", "evals/prompts/*"]
+skillswiki = ["web/static/*", "evals/config.json", "evals/SPEC.md", "evals/templates/*", "evals/prompts/*",
+              "assets/skills/skills-wiki/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

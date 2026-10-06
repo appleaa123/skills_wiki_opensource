@@ -5,8 +5,10 @@ Expected failures (ValueError) print one line to stderr and exit 1. Anything els
 import argparse
 import json
 import sys
+import zipfile
+from pathlib import Path
 
-from skillswiki import cards, discovery, learnings, library, loader, paths, store
+from skillswiki import agents, cards, discovery, errors, learnings, library, loader, paths, store
 from skillswiki.route import suggest
 
 CONFIG_KEYS = {"learning": ("on", "off")}
@@ -48,18 +50,43 @@ def cmd_list(args) -> None:
     _print(rows, args.json, human)
 
 
-def cmd_adopt(args) -> None:
-    result = library.adopt(args.slug)
-    human = f"Adopted {result['slug']}: {result['from']} -> {result['to']}"
+def _adopt_lines(result: dict, dry_run: bool) -> str:
+    verb, also = ("Would adopt", "would also move") if dry_run else ("Adopted", "also moved")
+    human = f"{verb} {result['slug']}: {result['from']} -> {result['to']}"
     for other in result["moved_copies"]:
-        human += f"\n  also moved an identical copy from {other} (release puts it back)"
+        human += f"\n  {also} an identical copy from {other} (release puts it back)"
     for other in result["linked_copies"]:
         human += (f"\n  note: {other} is the folder a symlink points to; left in place so the link keeps working "
                   "(your agents can still trigger it natively from there)")
     for other in result["differing_copies"]:
         human += (f"\n  warning: a different version is still active natively at {other}; your agent may still "
                   "trigger it on its own. Remove it, or make it identical and adopt again.")
-    _print(result, args.json, human)
+    for warning in result.get("warnings", []):
+        human += f"\n  warning: {warning['message']}"
+    return human
+
+
+def cmd_agents(args) -> None:
+    rows = agents.rows()
+    human = "\n".join(f"{r['key']:16} {r['name']:20} {'detected' if r['detected'] else '-':8} "
+                      f"{r['skills']:3} skill{'s' if r['skills'] != 1 else ''}" for r in rows)
+    _print(rows, args.json, human)
+
+
+def cmd_adopt(args) -> None:
+    result = library.plan_adopt(args.slug) if args.dry_run else library.adopt(args.slug)
+    _print(result, args.json, _adopt_lines(result, args.dry_run))
+
+
+def _release_lines(result: dict, dry_run: bool) -> str:
+    verb, also = ("Would release", "would also restore") if dry_run else ("Released", "also restored")
+    missing = "is missing, so it will not be restored" if dry_run else "was missing, so it was not restored"
+    human = f"{verb} {result['slug']}: {result['from']} -> {result['to']}"
+    for origin in result["restored_copies"]:
+        human += f"\n  {also} the copy at {origin}"
+    for origin in result["missing_copies"]:
+        human += f"\n  warning: the stored copy for {origin} {missing}"
+    return human
 
 
 def cmd_release(args) -> None:
@@ -67,21 +94,17 @@ def cmd_release(args) -> None:
         return cmd_release_all(args)
     if not args.slug:
         raise ValueError("give a skill slug or --all")
-    result = library.release(args.slug)
-    human = f"Released {result['slug']}: {result['from']} -> {result['to']}"
-    for origin in result["restored_copies"]:
-        human += f"\n  also restored the copy at {origin}"
-    for origin in result["missing_copies"]:
-        human += f"\n  warning: the stored copy for {origin} was missing, so it was not restored"
-    _print(result, args.json, human)
+    result = library.plan_release(args.slug) if args.dry_run else library.release(args.slug)
+    _print(result, args.json, _release_lines(result, args.dry_run))
 
 
 def cmd_release_all(args) -> None:
-    result = library.release_all()
+    result = library.release_all(dry_run=args.dry_run)
     if not result["released"] and not result["failed"]:
         return _print(result, args.json, "No adopted skills to release.")
     n = len(result["released"])
-    lines = [f"Released {n} skill{'s' if n != 1 else ''} back to {'their folders' if n != 1 else 'its folder'}."]
+    verb = "Would release" if args.dry_run else "Released"
+    lines = [f"{verb} {n} skill{'s' if n != 1 else ''} back to {'their folders' if n != 1 else 'its folder'}."]
     lines += [f"  {r['slug']} -> {r['to']}" for r in result["released"]]
     lines += [f"  FAILED {f['slug']}: {f['error']}" for f in result["failed"]]
     _print(result, args.json, "\n".join(lines))
@@ -126,7 +149,7 @@ def cmd_enrich(args) -> None:
     try:
         card = cards.enrich(args.slug, args.backend)
     except BackendUnavailable as exc:
-        raise ValueError(str(exc)) from exc
+        raise errors.SkillsWikiError("BACKEND_UNAVAILABLE", str(exc), backend=args.backend) from exc
     _print(card, args.json, json.dumps(card, indent=2))
 
 
@@ -154,6 +177,19 @@ def cmd_config(args) -> None:
         store.set_setting(args.key, args.value)
     value = store.get_setting(args.key, CONFIG_KEYS[args.key][0])
     _print({args.key: value}, args.json, f"{args.key} = {value}")
+
+
+def cmd_doctor(args) -> None:
+    from skillswiki import doctor
+    if not args.export:
+        rep = doctor.report()
+        return _print(rep, args.json, doctor.human(rep))
+    path = doctor.export(Path.cwd())
+    with zipfile.ZipFile(path) as zf:
+        names = sorted(zf.namelist())
+    _print({"path": str(path), "files": names}, args.json,
+           f"Wrote {path}\n  contains: {', '.join(names)}\nAttach it to your bug report; it holds no key values, "
+           "prompts, learnings or skill files.")
 
 
 def cmd_serve_mcp(args) -> None:
@@ -196,14 +232,18 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("list", help="list known skills")
     p.add_argument("--status", choices=["adopted", "native", "plugin"])
     p.set_defaults(func=cmd_list)
-    for name, func, text in (("adopt", cmd_adopt, "move a skill into the Skills Wiki library"),
-                             ("load", cmd_load, "print an adopted skill with its learnings")):
-        p = sub.add_parser(name, help=text)
-        p.add_argument("slug")
-        p.set_defaults(func=func)
+    sub.add_parser("agents", help="list the agents whose skill folders are scanned").set_defaults(func=cmd_agents)
+    p = sub.add_parser("adopt", help="move a skill into the Skills Wiki library")
+    p.add_argument("slug")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true", help="show what would move; move nothing")
+    p.set_defaults(func=cmd_adopt)
+    p = sub.add_parser("load", help="print an adopted skill with its learnings")
+    p.add_argument("slug")
+    p.set_defaults(func=cmd_load)
     p = sub.add_parser("release", help="move an adopted skill back (--all: every adopted skill)")
     p.add_argument("slug", nargs="?")
     p.add_argument("--all", action="store_true", help="release every adopted skill (run this before uninstalling)")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true", help="show what would move; move nothing")
     p.set_defaults(func=cmd_release)
     p = sub.add_parser("suggest", help="route a request to an adopted skill")
     p.add_argument("request")
@@ -243,6 +283,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-open", action="store_true", help="don't open a browser")
     p.set_defaults(func=cmd_ui)
 
+    p = sub.add_parser("doctor", help="show what is installed and configured (for bug reports)")
+    p.add_argument("--export", action="store_true", help="write a zip for a bug report into the current folder")
+    p.set_defaults(func=cmd_doctor)
+
     sub.add_parser("serve-mcp", help="run the MCP server over stdio").set_defaults(func=cmd_serve_mcp)
     sub.add_parser("hook", help="Claude Code UserPromptSubmit hook (reads stdin)").set_defaults(func=cmd_hook)
     return parser
@@ -269,7 +313,10 @@ def main(argv: list[str] | None = None) -> int:
         paths.load_env()
         args.func(args)
     except ValueError as exc:
-        print(f"skillswiki: {exc}", file=sys.stderr)
+        if args.json:
+            print(json.dumps({"ok": False, **errors.as_payload(exc)}), file=sys.stderr)
+        else:
+            print(f"skillswiki: {exc}", file=sys.stderr)
         return 1
     return 0
 

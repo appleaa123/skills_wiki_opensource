@@ -6,6 +6,7 @@ user's own AI CLI on request (`enrich`, which spends the user's tokens). Nothing
 import json
 
 from skillswiki import frontmatter, store
+from skillswiki.errors import SkillsWikiError
 from skillswiki.evals.backends import get_backend
 from skillswiki.textjson import extract_object
 
@@ -29,7 +30,7 @@ def _skill_row(slug: str) -> dict:
     with store.connect() as conn:
         row = conn.execute("SELECT slug, path FROM skills WHERE slug = ?", (slug,)).fetchone()
     if row is None:
-        raise ValueError(f"skill '{slug}' not found — run: skillswiki scan")
+        raise SkillsWikiError("NOT_FOUND", f"skill '{slug}' not found — run: skillswiki scan", slug=slug)
     return dict(row)
 
 
@@ -38,11 +39,12 @@ def _validate(card: dict) -> dict:
     for field in FIELDS:
         items = card.get(field, [])
         if not isinstance(items, list) or not all(isinstance(i, str) for i in items):
-            raise ValueError(f"{field} must be a list of strings")
+            raise SkillsWikiError("INVALID_INPUT", f"{field} must be a list of strings", field=field)
         if len(items) > MAX_ITEMS:
-            raise ValueError(f"{field} has {len(items)} items; max {MAX_ITEMS}")
+            raise SkillsWikiError("INVALID_INPUT", f"{field} has {len(items)} items; max {MAX_ITEMS}", field=field)
         if any(len(i) > MAX_ITEM_CHARS for i in items):
-            raise ValueError(f"{field} items must be at most {MAX_ITEM_CHARS} characters")
+            raise SkillsWikiError("INVALID_INPUT", f"{field} items must be at most {MAX_ITEM_CHARS} characters",
+                                  field=field)
         clean[field] = [i.strip() for i in items if i.strip()]
     return clean
 
@@ -83,7 +85,7 @@ def enrich(slug: str, backend: str = "claude") -> dict:
     from pathlib import Path
 
     if backend not in BACKENDS:
-        raise ValueError(f"backend must be one of {', '.join(BACKENDS)}")
+        raise SkillsWikiError("INVALID_INPUT", f"backend must be one of {', '.join(BACKENDS)}", field="backend")
     row = _skill_row(slug)
     skill_text = (Path(row["path"]) / frontmatter.SKILL_FILE).read_text(encoding="utf-8", errors="replace")
     prompt = ENRICH_PROMPT.format(skill=skill_text[:SKILL_TEXT_MAX_CHARS])
@@ -97,4 +99,5 @@ def enrich(slug: str, backend: str = "claude") -> dict:
                 return _save(slug, data, "enrich")
             except ValueError:
                 continue
-    raise ValueError(f"{backend} did not return a valid routing card; reply began: {reply[:200]!r}")
+    raise SkillsWikiError("BACKEND_UNAVAILABLE", f"{backend} did not return a valid routing card; reply began: "
+                          f"{reply[:200]!r}", backend=backend)

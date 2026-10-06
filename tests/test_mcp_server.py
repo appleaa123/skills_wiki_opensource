@@ -59,3 +59,18 @@ def test_learning_for_unknown_or_native_skill_refused(tmp_home):
     discovery.sync_db()
     assert "not found" in _call("learning_record", {"slug": "typo", "body": "x"})["error"]
     assert "not adopted" in _call("learning_record", {"slug": "csv-cleaner", "body": "x"})["error"]
+
+
+def test_errors_carry_codes(tmp_home):
+    assert _call("load_skill", {"slug": "nope"})["code"] == "NOT_FOUND"
+    assert _call("load_skill", {"slug": "nope"})["details"] == {"slug": "nope"}
+    store.set_setting("learning", "off")
+    assert _call("learning_record", {"slug": "x", "body": "y"})["code"] == "LEARNING_OFF"
+    assert _call("learning_list", {"slug": "x"})["code"] == "LEARNING_OFF"
+
+
+def test_instructions_come_from_the_shipped_skill():
+    from skillswiki import frontmatter, paths
+    from skillswiki.mcp_server import INSTRUCTIONS
+    assert INSTRUCTIONS == frontmatter.parse_skill(paths.shipped_skill_dir())["body"]
+    assert "load_skill" in INSTRUCTIONS and "learning_record" in INSTRUCTIONS

@@ -102,3 +102,16 @@ def test_ui_port_in_use(tmp_home, capsys):
         assert code == 1 and "cannot listen" in err
     finally:
         sock.close()
+
+
+def test_run_with_missing_cli_is_backend_unavailable(ready, capsys, monkeypatch):
+    from skillswiki.evals import runner
+    from skillswiki.evals.backends import BackendUnavailable
+
+    def down(**kwargs):
+        raise BackendUnavailable("claude -p failed to start: No such file")
+    monkeypatch.setattr(runner, "run_pack", down)
+    code, _, err = run(capsys, "--json", "eval", "run", "email-polisher", "--tier", "screen", "--judge", "claude")
+    assert code == 1
+    payload = json.loads(err.strip().splitlines()[-1])
+    assert payload["code"] == "BACKEND_UNAVAILABLE" and "failed to start" in payload["message"]
