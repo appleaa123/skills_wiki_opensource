@@ -1,7 +1,7 @@
 """The agents whose skill folders Skills Wiki scans, as data: add a row to support an agent.
 
-`skills_dirs` are user-level folders relative to the home directory; the first is where `skillswiki setup`
-installs the Skills Wiki skill. `detect_dir` is a folder whose presence means the agent is installed. Row order
+`skills_dirs` are user-level folders relative to the home directory; the first is the agent's main
+skills folder. `detect_dir` is a folder whose presence means the agent is installed. Row order
 is adoption priority: when the same skill sits in several folders, the first folder's copy is the one adopted.
 The path list is adapted from skills-manager's agent table (github.com/xingkongliang/skills-manager, MIT) and
 the Antigravity docs (antigravity.google/docs/skills); no code was copied.

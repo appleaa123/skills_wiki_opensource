@@ -13,8 +13,9 @@ requests, checks your test suites and grades through a cascade. Without a key, e
 
 Works with skills for **Claude Code, Codex and Antigravity** (folders containing a `SKILL.md`).
 
-> **Beta (v0.2).** Needs Python 3.11–3.13. Adopting a skill moves its folder, so **back up your skills folders
-> first** (the folders `skillswiki agents` lists, such as `~/.claude/skills` and `~/.agents/skills`). See
+> **Beta (v0.3).** Needs Python 3.11–3.13. Adopting a skill moves its folder. `skillswiki setup` backs up every
+> folder and settings file it touches; if you adopt by hand, **back up your skills folders first** (the folders
+> `skillswiki agents` lists, such as `~/.claude/skills` and `~/.agents/skills`). See
 > [Status and limits](#status-and-limits) before you rely on it.
 
 ## Quickstart
@@ -22,13 +23,18 @@ Works with skills for **Claude Code, Codex and Antigravity** (folders containing
 ```bash
 # needs pipx: brew install pipx   (or: python3 -m pip install --user pipx), then once: pipx ensurepath
 pipx install git+https://github.com/appleaa123/skills_wiki_opensource.git
-skillswiki scan                    # find installed skills
-skillswiki adopt <slug>            # let Skills Wiki route and load it (reversible: skillswiki release <slug>)
-claude mcp add skills-wiki -- skillswiki serve-mcp    # or any MCP client
+skillswiki setup                   # guided: moves your skills in, connects every agent you have, tests each one
 skillswiki ui                      # the local management page
 ```
 
-Full walkthrough, including the Claude Code hook and other agents: [docs/quickstart.md](docs/quickstart.md).
+`skillswiki setup` explains each step before doing it. It backs up what it touches, moves your skills into Skills
+Wiki and connects each agent it finds on your machine, then helps you test that the agent asks Skills Wiki.
+`skillswiki setup --dry-run` shows the plan without changing anything. Installed new skills later? Run
+`skillswiki setup` again, or `skillswiki adopt --all`. `skillswiki learn export <slug>` saves a skill's learnings as
+Markdown.
+
+Prefer to do it by hand (`scan`, `adopt <slug>`, the MCP server, the Claude Code hook)? See
+[docs/quickstart.md](docs/quickstart.md).
 
 ## How routing works
 
@@ -188,18 +194,34 @@ What has been tested, and what to know before relying on it:
   `python -c "from skillswiki import paths; print(paths.shipped_skill_dir())"`) and its text is what the MCP server
   tells agents. Copying it into an agent's skills folder did not help in our test (2026-10-06, five prompts, five
   adopted skills, one run each): Claude Code asked Skills Wiki on 2 of 5 prompts with the skill and 2 of 5
-  without; Antigravity on 0 of 5 either way. So there is no setup command for it; use the Claude Code hook.
+  without; Antigravity on 0 of 5 either way. So `skillswiki setup` does not install it; it connects each agent
+  with a hook or a rules line instead.
 - **`skillswiki doctor --export`** writes a zip for bug reports: versions, paths, table sizes, agent and config
   detection, usage counts, the names (not values) of keys in `.env`, and `RESTORE.json`. It never includes your
   prompts, learnings, eval outputs or skill files.
+- **`skillswiki setup` connects agents from their docs.** Hook, rules-file and server locations come from each
+  agent's documentation (checked 2026-10-06). Only Claude Code and Antigravity have been tried live; everything
+  else is confirmed by the guided test on your machine. If a test fails, setup tries the next way and finally tells
+  you what to do.
+- **Hooks that cannot add context.** GitHub Copilot, Cursor, Windsurf and Goose have prompt hooks that can only
+  allow or block a prompt, so setup uses their rules file instead. Antigravity's hook never sees your prompt, so it
+  adds a standing reminder to check Skills Wiki before every model call. Cline's and Kiro's hooks are not used
+  (Cline's input format is no longer documented; Kiro's hooks are per project), so they get a rules file.
+- **Some agents set themselves up.** Where Skills Wiki cannot edit a settings file itself (YAML files such as
+  Hermes's or Goose's, Cursor's rules screen, or a file it cannot read), setup gives you a prompt to paste into that
+  agent, which shows the change and waits for your approval. Uninstall gives you the matching removal prompt.
+- **Codex** reads `~/.codex/AGENTS.override.md` instead of `AGENTS.md` when that file exists, so setup's rules
+  line has no effect there; the hook still works.
 
 ## Uninstall
 
 ```bash
-skillswiki release --all           # put every adopted skill back where your agents expect it
+skillswiki uninstall               # saves learnings as Markdown, puts every skill back, disconnects your agents
 pipx uninstall skillswiki
-rm -rf ~/.skillswiki               # optional: your learnings, cards, eval results and settings
+rm -rf ~/.skillswiki               # optional: your learnings, cards, eval results, backups and settings
 ```
+
+`skillswiki uninstall` stops before disconnecting anything if a skill cannot go back, and tells you why.
 
 Uninstalling never deletes your skills. If you uninstall before releasing, adopted skills stay in
 `~/.skillswiki/library/`, and reinstalling then running `skillswiki release --all` puts them back. Without Skills

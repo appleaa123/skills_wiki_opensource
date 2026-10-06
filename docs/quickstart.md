@@ -25,6 +25,21 @@ Windows). On Windows, `~` below means `%USERPROFILE%`:
 mkdir -p ~/.skillswiki && cp .env.example ~/.skillswiki/.env   # then edit it
 ```
 
+## One command (recommended)
+
+```bash
+skillswiki setup                   # asks: guided (step by step, with tests) or automatic
+skillswiki setup --dry-run         # show the plan only
+skillswiki setup --yes             # automatic, no questions; test agents later:
+skillswiki setup --test all        # the guided test for every connected agent (or one agent key)
+skillswiki uninstall               # put everything back before `pipx uninstall skillswiki`
+```
+
+Setup scans every agent's skill folders, backs up what it will touch to `~/.skillswiki/backups/`, moves your skills
+into the library, and connects each agent: its hook first, then a line in its rules file, each followed by a short
+test you run in the agent. If neither works, it tells you what to say to that agent. Prefer to do it by hand? Steps
+2 to 4 below.
+
 ## 2. Find and adopt your skills
 
 ```bash
