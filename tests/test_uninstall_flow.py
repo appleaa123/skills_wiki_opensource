@@ -1,8 +1,7 @@
 from pathlib import Path
 
 import pytest
-from helpers import install_fixture_skills
-from helpers import scripted, snapshot, two_agents
+from helpers import install_fixture_skills, scripted, snapshot, two_agents
 
 from skillswiki import backup, learnings, setup_flow, uninstall_flow, wiring
 from skillswiki.setup_flow import AUTOMATIC

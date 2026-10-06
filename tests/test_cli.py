@@ -189,3 +189,23 @@ def test_adopt_all_cli(tmp_home, capsys):
     assert code == 0 and "No new skills to adopt." in out
     code, _, err = run(capsys, "adopt")
     assert code == 1 and "give a skill slug or --all" in err
+
+
+def test_setup_and_uninstall_commands(tmp_home, capsys, monkeypatch):
+    from skillswiki import wiring
+    monkeypatch.setattr(wiring, "_which", lambda name: None)
+    install_fixture_skills(Path.home() / ".claude" / "skills", ["email-polisher"])
+    code, out, _ = run(capsys, "--json", "setup", "--dry-run")
+    assert code == 0 and json.loads(out)["plan"]["adopted"][0]["slug"] == "email-polisher"
+    code, out, _ = run(capsys, "setup", "--yes")
+    assert code == 0 and "Summary:" in out and "Claude Code" in out
+    code, out, _ = run(capsys, "uninstall", "--yes", "--delete-backups")
+    assert code == 0 and "pipx uninstall skillswiki" in out
+    assert (Path.home() / ".claude/skills/email-polisher/SKILL.md").is_file()
+
+
+def test_setup_stops_when_input_ends(tmp_home, capsys, monkeypatch):
+    install_fixture_skills(Path.home() / ".claude" / "skills", ["email-polisher"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": (_ for _ in ()).throw(EOFError()))
+    code, out, _ = run(capsys, "setup")
+    assert code == 0 and "Stopped" in out and (Path.home() / ".claude/skills/email-polisher").is_dir()

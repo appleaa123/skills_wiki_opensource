@@ -308,6 +308,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     from skillswiki import cli_eval
     cli_eval.register(sub)
+    from skillswiki import cli_setup
+    cli_setup.register(sub)
 
     p = sub.add_parser("ui", help="open the local management page")
     p.add_argument("--port", type=int, default=7878)
