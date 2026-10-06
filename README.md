@@ -200,8 +200,9 @@ What has been tested, and what to know before relying on it:
   detection, usage counts, the names (not values) of keys in `.env`, and `RESTORE.json`. It never includes your
   prompts, learnings, eval outputs or skill files.
 - **`skillswiki setup` connects agents from their docs.** Hook, rules-file and server locations come from each
-  agent's documentation (checked 2026-10-06). Only Claude Code and Antigravity have been tried live; everything
-  else is confirmed by the guided test on your machine. If a test fails, setup tries the next way and finally tells
+  agent's documentation (checked 2026-10-06). In a live run (2026-10-06), Claude Code's hook pointed it at the right
+  skill. Antigravity answered the test through a separately registered hosted Skills Wiki server, so its local
+  wiring is not confirmed yet. Everything else is confirmed by the guided test on your machine. If a test fails, setup tries the next way and finally tells
   you what to do.
 - **Hooks that cannot add context.** GitHub Copilot, Cursor, Windsurf and Goose have prompt hooks that can only
   allow or block a prompt, so setup uses their rules file instead. Antigravity's hook never sees your prompt, so it
