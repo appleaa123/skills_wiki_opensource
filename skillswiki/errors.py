@@ -11,7 +11,8 @@ DEFAULT_CODE = "INVALID_INPUT"
 
 class SkillsWikiError(ValueError):
     def __init__(self, code: str, message: str, **details):
-        assert code in CODES, f"unknown error code {code!r}"  # a programming error, never a user error
+        if code not in CODES:  # a programming error, never a user error; LookupError so no ValueError
+            raise LookupError(f"unknown error code {code!r}")  # handler reports it as INVALID_INPUT
         super().__init__(message)
         self.code = code
         self.details = details
