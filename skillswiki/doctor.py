@@ -124,8 +124,8 @@ def _env_keys(env_file: Path) -> list[str]:
     if not env_file.is_file():
         return []
     keys = []
-    for line in env_file.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
+    for line in env_file.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip().removeprefix("export ").strip()
         if line and not line.startswith("#") and "=" in line:
             keys.append(line.split("=", 1)[0].strip())
     return sorted(keys)

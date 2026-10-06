@@ -121,3 +121,17 @@ def test_two_exports_in_the_same_minute_get_different_files(tmp_home, monkeypatc
     first = doctor.export(Path.cwd())
     second = doctor.export(Path.cwd())
     assert first != second and first.is_file() and second.is_file()
+
+
+def test_env_keys_ignores_undecodable_bytes(tmp_home):
+    env = paths.home() / ".env"
+    env.parent.mkdir(parents=True, exist_ok=True)
+    env.write_bytes(b"GOOD=1\n\xff\xfe=junk\n")
+    assert "GOOD" in doctor._env_keys(env)
+
+
+def test_env_keys_strips_a_leading_export(tmp_home):
+    env = paths.home() / ".env"
+    env.parent.mkdir(parents=True, exist_ok=True)
+    env.write_text("export TYPESAFE_API_KEY=abc\nOTHER=1\n", encoding="utf-8")
+    assert doctor._env_keys(env) == ["OTHER", "TYPESAFE_API_KEY"]
