@@ -52,6 +52,36 @@ def _exists(path: Path) -> bool:
     return path.exists() or _is_link(path)
 
 
+FOREIGN_LINK_CODE = "FOREIGN_LINK"
+FOREIGN_LINK_MESSAGE = ("{path} is a link into {target}, placed by another tool (for example skills-manager). "
+                        "That tool may put it back after you adopt; undeploy it there first, or adopt anyway.")
+
+
+def _under(path: Path, roots: list[Path]) -> bool:
+    for root in roots:
+        try:
+            path.relative_to(root.resolve())
+            return True
+        except ValueError:
+            continue
+    return False
+
+
+def foreign_link_warnings(folders: list[Path]) -> list[dict]:
+    """A warning for each folder that is a link whose target is not under any scan root or the library:
+    another tool deployed it there and may deploy it again."""
+    known = [*paths.scan_roots(), paths.library_dir()]
+    warnings = []
+    for folder in folders:
+        if not _is_link(folder):
+            continue
+        target = folder.resolve()
+        if not _under(target, known):
+            warnings.append({"code": FOREIGN_LINK_CODE, "path": str(folder), "target": str(target),
+                             "message": FOREIGN_LINK_MESSAGE.format(path=folder, target=target)})
+    return warnings
+
+
 def _copies_dir(slug: str) -> Path:
     return paths.library_dir() / COPIES_DIR / slug
 
@@ -115,7 +145,7 @@ def plan_adopt(slug: str) -> dict:
     return {"slug": slug, "from": str(source), "to": str(target), "fingerprint": digest,
             "moved_copies": [str(o) for o in identical], "other_copies": [str(o) for o in differing + linked],
             "differing_copies": [str(o) for o in differing], "linked_copies": [str(o) for o in linked],
-            "warnings": []}
+            "warnings": foreign_link_warnings([source, *identical])}
 
 
 def adopt(slug: str) -> dict:

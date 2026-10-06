@@ -59,6 +59,8 @@ def _adopt_lines(result: dict, dry_run: bool) -> str:
     for other in result["differing_copies"]:
         human += (f"\n  warning: a different version is still active natively at {other}; your agent may still "
                   "trigger it on its own. Remove it, or make it identical and adopt again.")
+    for warning in result.get("warnings", []):
+        human += f"\n  warning: {warning['message']}"
     return human
 
 

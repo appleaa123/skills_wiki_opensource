@@ -395,3 +395,29 @@ def test_release_all_dry_run_moves_nothing(native):
     result = library.release_all(dry_run=True)
     assert [r["slug"] for r in result["released"]] == ["csv-cleaner", "email-polisher"] and result["failed"] == []
     assert not (native / "email-polisher").exists() and not (native / "csv-cleaner").exists()
+
+
+@needs_symlinks
+def test_adopt_warns_on_link_placed_by_another_tool(tmp_home):
+    real = install_fixture_skills(tmp_home / "other-tool" / "skills", ["meeting-notes"]) / "meeting-notes"
+    os.symlink(real, tmp_home / "native" / "meeting-notes")
+    discovery.sync_db()
+    plan = library.plan_adopt("meeting-notes")
+    assert [w["code"] for w in plan["warnings"]] == ["FOREIGN_LINK"]
+    assert plan["warnings"][0]["target"] == str(real.resolve())
+    assert "skills-manager" in plan["warnings"][0]["message"]
+    assert library.adopt("meeting-notes")["warnings"] == plan["warnings"]  # warned, still adopted
+
+
+@needs_symlinks
+def test_link_into_a_scanned_root_is_not_foreign(tmp_home):
+    real = install_fixture_skills(tmp_home / "userhome" / ".agents" / "skills", ["email-polisher"]) / "email-polisher"
+    link_root = tmp_home / "userhome" / ".claude" / "skills"
+    link_root.mkdir(parents=True)
+    os.symlink(real, link_root / "email-polisher")
+    discovery.sync_db()
+    assert library.plan_adopt("email-polisher")["warnings"] == []
+
+
+def test_plain_folder_is_never_foreign(native):
+    assert library.plan_adopt("email-polisher")["warnings"] == []

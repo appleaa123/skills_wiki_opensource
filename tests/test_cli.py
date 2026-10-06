@@ -1,8 +1,10 @@
 import json
+import os
 import subprocess
 from pathlib import Path
 import sys
 
+from conftest import needs_symlinks
 from helpers import install_fixture_skills
 
 from skillswiki import cli
@@ -117,3 +119,12 @@ def test_release_dry_run(tmp_home, capsys):
     assert not (native / "csv-cleaner").exists()
     code, out, _ = run(capsys, "release", "--all")
     assert code == 0 and "Released 2 skills" in out and (native / "csv-cleaner").is_dir()
+
+
+@needs_symlinks
+def test_adopt_dry_run_prints_foreign_link_warning(tmp_home, capsys):
+    real = install_fixture_skills(tmp_home / "other-tool" / "skills", ["meeting-notes"]) / "meeting-notes"
+    os.symlink(real, tmp_home / "native" / "meeting-notes")
+    run(capsys, "scan")
+    code, out, _ = run(capsys, "adopt", "meeting-notes", "--dry-run")
+    assert code == 0 and "warning:" in out and "another tool" in out
