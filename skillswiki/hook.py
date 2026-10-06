@@ -7,6 +7,7 @@ import json
 import sys
 
 MIN_PROMPT_CHARS = 15
+MIN_CJK_PROMPT_CHARS = 4  # a Chinese/Japanese/Korean request is complete in far fewer characters
 BUDGET_S = 5.0  # well inside every agent's hook timeout; past it, keyword routing answers
 SHORTLIST_SHOWN = 3
 EVENT = "UserPromptSubmit"
@@ -19,10 +20,14 @@ def context_line(result: dict) -> str:
         return (f"Skills Wiki: skill \"{result['skill']}\" fits this request (confidence "
                 f"{result.get('confidence', 0):.2f}). Load it with load_skill or `skillswiki load {result['skill']}`.")
     names = [i["skill"] for i in result.get("shortlist", [])[:SHORTLIST_SHOWN]]
-    if names:
-        return (f"Skills Wiki: possibly relevant skills: {', '.join(names)}. If one clearly fits, load it with "
-                "load_skill or `skillswiki load <slug>`; otherwise proceed without a skill.")
-    return ""
+    if not names:
+        return ""
+    # Firm about checking, not about using: a keyword top match can be a false positive (Phase 12 test run).
+    top, rest = names[0], names[1:]
+    line = (f"Skills Wiki: this user installed a skill that may cover this request: \"{top}\". Before you answer, "
+            f"load it with load_skill (or run `skillswiki load {top}`) and follow it if it fits; answer normally if it "
+            "does not fit.")
+    return line + (f" Other candidates: {', '.join(rest)}." if rest else "")
 
 
 def _prompt(fmt: str, payload: dict) -> str:
@@ -39,6 +44,11 @@ def _reply(fmt: str, event: str, line: str) -> str:
     return json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": line}})
 
 
+def _long_enough(prompt: str) -> bool:
+    from skillswiki.route.keyword import has_cjk
+    return len(prompt) >= (MIN_CJK_PROMPT_CHARS if has_cjk(prompt) else MIN_PROMPT_CHARS)
+
+
 def respond(payload: dict, agent: str = DEFAULT_AGENT) -> str:
     from skillswiki import wiring_data
     w = wiring_data.by_key(agent)
@@ -47,7 +57,7 @@ def respond(payload: dict, agent: str = DEFAULT_AGENT) -> str:
         return json.dumps({"injectSteps": [{"ephemeralMessage": wiring_data.RULES_TEXT}]})
     event = (w.hook.detail.get("keys") or [EVENT])[-1] if w.hook else EVENT
     prompt = _prompt(fmt, payload).strip()
-    if len(prompt) < MIN_PROMPT_CHARS or prompt.startswith("/"):
+    if not _long_enough(prompt) or prompt.startswith("/"):
         return _reply(fmt, event, "")
     from skillswiki.route import suggest
     return _reply(fmt, event, context_line(suggest(prompt, budget_s=BUDGET_S)))

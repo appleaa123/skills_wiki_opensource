@@ -207,5 +207,15 @@ def remove_all(key: str) -> dict:
 
 
 def set_test(key: str, result: str) -> None:
+    """Record the user's own test result; it replaces any earlier 'tested by Skills Wiki' mark."""
     with store.connect() as conn:
-        conn.execute("UPDATE wiring SET test = ?, updated_at = ? WHERE agent = ?", (result, store.now(), key))
+        # a skipped test ('untested') is not a result, so it keeps a 'tested by Skills Wiki' mark
+        conn.execute("UPDATE wiring SET test = ?, vouched = CASE WHEN ? = 'untested' THEN vouched ELSE 0 END, "
+                     "updated_at = ? WHERE agent = ?", (result, result, store.now(), key))
+
+
+def set_vouched(key: str) -> None:
+    """The user skipped the test because Skills Wiki tested this agent itself (wiring_data tested)."""
+    with store.connect() as conn:
+        conn.execute("UPDATE wiring SET test = 'untested', vouched = 1, updated_at = ? WHERE agent = ?",
+                     (store.now(), key))

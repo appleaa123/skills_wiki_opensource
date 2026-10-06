@@ -23,7 +23,7 @@ def scripted(answers):
         if not queue:
             raise Stop("Input ended.")
         answer = queue.pop(0)
-        assert answer in choices, (question, choices)
+        assert not choices or answer in choices, (question, choices)  # () = free text
         return answer
     return Io(say=said.append, ask=ask), said
 

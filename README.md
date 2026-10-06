@@ -200,9 +200,13 @@ What has been tested, and what to know before relying on it:
   detection, usage counts, the names (not values) of keys in `.env`, and `RESTORE.json`. It never includes your
   prompts, learnings, eval outputs or skill files.
 - **`skillswiki setup` connects agents from their docs.** Hook, rules-file and server locations come from each
-  agent's documentation (checked 2026-10-06). In a live run (2026-10-06), Claude Code's hook pointed it at the right
-  skill. Antigravity answered the test through a separately registered hosted Skills Wiki server, so its local
-  wiring is not confirmed yet. Everything else is confirmed by the guided test on your machine. If a test fails, setup tries the next way and finally tells
+  agent's documentation (checked 2026-10-06). We tested two agents ourselves (2026-10-06, no other Skills Wiki
+  server registered, five requests in everyday words for five different skills plus one unrelated question):
+  **Claude Code** loaded the right skill for 4 of 5 and none for the unrelated question, so setup lets you skip its
+  test. **Antigravity CLI** asked Skills Wiki on most requests but loaded the right skill for 3 of 5: it translates
+  non-English requests into English before asking, so a skill described only in Chinese can be missed. Every other
+  agent is confirmed by the guided test on your machine. The test request comes from your own AI (a few of your
+  tokens) or, if that fails, from you; never from the skill's own description, which any search would match. If a test fails, setup tries the next way and finally tells
   you what to do.
 - **Hooks that cannot add context.** GitHub Copilot, Cursor, Windsurf and Goose have prompt hooks that can only
   allow or block a prompt, so setup uses their rules file instead. Antigravity's hook never sees your prompt, so it
@@ -214,6 +218,9 @@ What has been tested, and what to know before relying on it:
 - **Agents started from the Dock or Start menu** may not see your terminal's PATH, so their hook or server can't
   find the `skillswiki` command. If such an agent fails its test, start it from a terminal and run
   `skillswiki setup --test <agent>` again.
+- **Keyword routing** (no TypeSafe key) matches words, so a request phrased very differently from a skill's description
+  can miss it; a routing card or the key fixes that. Chinese, Japanese and Korean requests are matched by character
+  pairs.
 - **Codex** reads `~/.codex/AGENTS.override.md` instead of `AGENTS.md` when that file exists, so setup's rules
   line has no effect there; the hook still works.
 

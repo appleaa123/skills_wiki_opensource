@@ -93,3 +93,20 @@ def test_unknown_agent_prints_nothing(adopted, monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"prompt": PROMPT})))
     hook.main(["--agent", "nope"])
     assert capsys.readouterr().out == ""
+
+
+def test_shortlist_hint_asks_the_agent_to_check_before_answering(adopted):
+    """Phase 12: Claude Code ignored 'if one clearly fits ... otherwise proceed'; the hint now asks it to open the
+    top match and judge, without ordering it to use a skill that may be a keyword false positive."""
+    line = hook.context_line({"shortlist": [{"skill": "email-polisher", "score": 3.0},
+                                            {"skill": "csv-cleaner", "score": 1.0}]})
+    assert "Before you answer" in line and "load_skill" in line and "email-polisher" in line
+    assert "otherwise proceed without a skill" not in line
+    assert "csv-cleaner" in line and "if it does not fit" in line
+
+
+def test_short_chinese_request_is_routed(adopted):
+    """Review: an 8-character Chinese request is complete; the 15-character gate is for English."""
+    from skillswiki.route import keyword
+    assert hook._long_enough("帮我润色这封邮件") and not hook._long_enough("帮我")
+    assert hook._long_enough("please fix my email draft") and not hook._long_enough("fix my email")

@@ -35,6 +35,10 @@ GUI_PATH_NOTE = ("Note: an agent you start from the Dock or Start menu may not s
                  "fails, start it from a terminal and run `skillswiki setup --test <agent>` again.")
 TRY_NEXT = "Undoing that and trying the next way."
 NO_TEST_SKILL = "There is no adopted skill to test with yet, so testing is skipped. Later: skillswiki setup --test all"
+PARAPHRASE_NOTICE = ("To test each agent I need a request one of your skills should handle, in different words from "
+                     "its description. I'm asking {backend} to write one; this uses a few of your tokens.")
+ASK_REQUEST = "Your request (or press Enter to skip testing):"
+ASK_TEST_ANYWAY = "Run the test anyway? [y/n]"
 TEST_CHANGES_FILES = ("If an agent fails its test, I undo its current connection and try the next way, backing up each "
                       "file first.")
 
@@ -111,6 +115,16 @@ def agent_error(name: str, exc: BaseException) -> str:
     return f"{name}: something went wrong ({exc}). Skipping it; the others continue."
 
 
+def type_request(slug: str, description: str) -> str:
+    return (f"Please type a request you'd normally give your agent that your skill {slug} should handle. It "
+            f"describes itself as: {description[:200]}")
+
+
+def known_result(name: str, tested: str) -> str:
+    return (f"We tested {name} ourselves ({tested}). You can skip the test; it is then recorded as tested by Skills "
+            "Wiki rather than on this machine.")
+
+
 def not_connected(key: str) -> str:
     return f"{key} is not connected yet; run `skillswiki setup` first."
 
@@ -123,6 +137,8 @@ def _status(o: dict) -> str:
         return f"{name}: skipped; run `skillswiki setup` again to connect it."
     if o["method"] == "advice":
         return f"{name}: tell it \"check Skills Wiki\" when you need one of your skills (instruction above)."
+    if o["test"] == "vouched":
+        return f"{name}: asks Skills Wiki through its {way} (tested by Skills Wiki, not on this machine)."
     if o["test"] == "tested_ok":
         return f"{name}: asks Skills Wiki through its {way} (tested)."
     after = f" once you've pasted the prompt above into {name}" if o["self_setup"] else ""
