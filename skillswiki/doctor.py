@@ -22,7 +22,8 @@ def _tables() -> dict:
     with store.connect() as conn:
         names = [r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' "
                                                    "AND name NOT LIKE 'sqlite_%' ORDER BY name")]
-        return {n: conn.execute(f"SELECT COUNT(*) AS n FROM {n}").fetchone()["n"] for n in names}
+        quoted = {n: '"' + n.replace('"', '""') + '"' for n in names}
+        return {n: conn.execute(f"SELECT COUNT(*) AS n FROM {quoted[n]}").fetchone()["n"] for n in names}
 
 
 def _adopted() -> tuple[list[str], list[str]]:

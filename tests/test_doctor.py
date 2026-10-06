@@ -100,3 +100,11 @@ def test_doctor_survives_unexpected_json_shapes(tmp_home):
         (home / ".claude.json").write_text(json.dumps(config), encoding="utf-8")
         status = doctor.report()["claude_code"]
         assert set(status.values()) <= {"yes", "no", "unreadable"}
+
+
+def test_tables_counts_a_table_with_a_reserved_name(tmp_home):
+    from skillswiki import store
+    with store.connect() as conn:
+        conn.execute('CREATE TABLE "order" (id INTEGER)')
+        conn.execute('INSERT INTO "order" VALUES (1)')
+    assert doctor.report()["db"]["tables"]["order"] == 1
