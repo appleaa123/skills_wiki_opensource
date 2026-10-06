@@ -48,18 +48,34 @@ def cmd_list(args) -> None:
     _print(rows, args.json, human)
 
 
-def cmd_adopt(args) -> None:
-    result = library.adopt(args.slug)
-    human = f"Adopted {result['slug']}: {result['from']} -> {result['to']}"
+def _adopt_lines(result: dict, dry_run: bool) -> str:
+    verb, also = ("Would adopt", "would also move") if dry_run else ("Adopted", "also moved")
+    human = f"{verb} {result['slug']}: {result['from']} -> {result['to']}"
     for other in result["moved_copies"]:
-        human += f"\n  also moved an identical copy from {other} (release puts it back)"
+        human += f"\n  {also} an identical copy from {other} (release puts it back)"
     for other in result["linked_copies"]:
         human += (f"\n  note: {other} is the folder a symlink points to; left in place so the link keeps working "
                   "(your agents can still trigger it natively from there)")
     for other in result["differing_copies"]:
         human += (f"\n  warning: a different version is still active natively at {other}; your agent may still "
                   "trigger it on its own. Remove it, or make it identical and adopt again.")
-    _print(result, args.json, human)
+    return human
+
+
+def cmd_adopt(args) -> None:
+    result = library.plan_adopt(args.slug) if args.dry_run else library.adopt(args.slug)
+    _print(result, args.json, _adopt_lines(result, args.dry_run))
+
+
+def _release_lines(result: dict, dry_run: bool) -> str:
+    verb, also = ("Would release", "would also restore") if dry_run else ("Released", "also restored")
+    missing = "is missing, so it will not be restored" if dry_run else "was missing, so it was not restored"
+    human = f"{verb} {result['slug']}: {result['from']} -> {result['to']}"
+    for origin in result["restored_copies"]:
+        human += f"\n  {also} the copy at {origin}"
+    for origin in result["missing_copies"]:
+        human += f"\n  warning: the stored copy for {origin} {missing}"
+    return human
 
 
 def cmd_release(args) -> None:
@@ -67,21 +83,17 @@ def cmd_release(args) -> None:
         return cmd_release_all(args)
     if not args.slug:
         raise ValueError("give a skill slug or --all")
-    result = library.release(args.slug)
-    human = f"Released {result['slug']}: {result['from']} -> {result['to']}"
-    for origin in result["restored_copies"]:
-        human += f"\n  also restored the copy at {origin}"
-    for origin in result["missing_copies"]:
-        human += f"\n  warning: the stored copy for {origin} was missing, so it was not restored"
-    _print(result, args.json, human)
+    result = library.plan_release(args.slug) if args.dry_run else library.release(args.slug)
+    _print(result, args.json, _release_lines(result, args.dry_run))
 
 
 def cmd_release_all(args) -> None:
-    result = library.release_all()
+    result = library.release_all(dry_run=args.dry_run)
     if not result["released"] and not result["failed"]:
         return _print(result, args.json, "No adopted skills to release.")
     n = len(result["released"])
-    lines = [f"Released {n} skill{'s' if n != 1 else ''} back to {'their folders' if n != 1 else 'its folder'}."]
+    verb = "Would release" if args.dry_run else "Released"
+    lines = [f"{verb} {n} skill{'s' if n != 1 else ''} back to {'their folders' if n != 1 else 'its folder'}."]
     lines += [f"  {r['slug']} -> {r['to']}" for r in result["released"]]
     lines += [f"  FAILED {f['slug']}: {f['error']}" for f in result["failed"]]
     _print(result, args.json, "\n".join(lines))
@@ -196,14 +208,17 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("list", help="list known skills")
     p.add_argument("--status", choices=["adopted", "native", "plugin"])
     p.set_defaults(func=cmd_list)
-    for name, func, text in (("adopt", cmd_adopt, "move a skill into the Skills Wiki library"),
-                             ("load", cmd_load, "print an adopted skill with its learnings")):
-        p = sub.add_parser(name, help=text)
-        p.add_argument("slug")
-        p.set_defaults(func=func)
+    p = sub.add_parser("adopt", help="move a skill into the Skills Wiki library")
+    p.add_argument("slug")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true", help="show what would move; move nothing")
+    p.set_defaults(func=cmd_adopt)
+    p = sub.add_parser("load", help="print an adopted skill with its learnings")
+    p.add_argument("slug")
+    p.set_defaults(func=cmd_load)
     p = sub.add_parser("release", help="move an adopted skill back (--all: every adopted skill)")
     p.add_argument("slug", nargs="?")
     p.add_argument("--all", action="store_true", help="release every adopted skill (run this before uninstalling)")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true", help="show what would move; move nothing")
     p.set_defaults(func=cmd_release)
     p = sub.add_parser("suggest", help="route a request to an adopted skill")
     p.add_argument("request")

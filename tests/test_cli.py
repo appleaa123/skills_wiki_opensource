@@ -79,3 +79,41 @@ def test_release_all_cli(tmp_home, capsys):
     assert code == 0 and "No adopted skills" in out
     code, _, err = run(capsys, "release")
     assert code == 1 and "slug or --all" in err
+
+
+def test_adopt_dry_run_moves_nothing(tmp_home, capsys):
+    native = install_fixture_skills(tmp_home / "native")
+    run(capsys, "scan")
+    code, out, _ = run(capsys, "adopt", "email-polisher", "--dry-run")
+    assert code == 0 and out.startswith("Would adopt email-polisher:")
+    assert (native / "email-polisher").is_dir()
+    _, out, _ = run(capsys, "--json", "list", "--status", "adopted")
+    assert json.loads(out) == []
+    code, out, _ = run(capsys, "--json", "adopt", "email-polisher", "--dry-run")
+    assert code == 0 and json.loads(out)["to"].endswith("email-polisher")
+
+
+def test_adopt_dry_run_on_vanished_folder(tmp_home, capsys):
+    import shutil
+    native = install_fixture_skills(tmp_home / "native")
+    run(capsys, "scan")
+    shutil.rmtree(native / "email-polisher")
+    code, _, err = run(capsys, "adopt", "email-polisher", "--dry-run")
+    assert code == 1 and "no longer at" in err
+    _, out, _ = run(capsys, "--json", "list", "--status", "native")
+    assert "email-polisher" in [r["slug"] for r in json.loads(out)]  # the row is untouched until the next scan
+
+
+def test_release_dry_run(tmp_home, capsys):
+    native = install_fixture_skills(tmp_home / "native")
+    run(capsys, "scan")
+    run(capsys, "adopt", "email-polisher")
+    run(capsys, "adopt", "csv-cleaner")
+    code, out, _ = run(capsys, "release", "email-polisher", "--dry-run")
+    assert code == 0 and out.startswith("Would release email-polisher:")
+    assert not (native / "email-polisher").exists()
+    code, out, _ = run(capsys, "release", "--all", "--dry-run")
+    assert code == 0 and "Would release 2 skills" in out
+    assert not (native / "csv-cleaner").exists()
+    code, out, _ = run(capsys, "release", "--all")
+    assert code == 0 and "Released 2 skills" in out and (native / "csv-cleaner").is_dir()
