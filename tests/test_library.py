@@ -41,7 +41,8 @@ def test_adopt_moves_folder_and_updates_row(native):
     result = library.adopt("email-polisher")
     target = paths.library_dir() / "email-polisher"
     assert result == {"slug": "email-polisher", "from": str(native / "email-polisher"), "to": str(target),
-                      "moved_copies": [], "other_copies": [], "differing_copies": [], "linked_copies": []}
+                      "fingerprint": library.fingerprint(target), "moved_copies": [], "other_copies": [],
+                      "differing_copies": [], "linked_copies": [], "warnings": []}
     assert not (native / "email-polisher").exists() and (target / "SKILL.md").is_file()
     row = _row("email-polisher")
     assert row["status"] == "adopted" and row["path"] == str(target)
@@ -336,3 +337,61 @@ def test_recovery_manifest_tracks_adopted_skills(native, tmp_home):
 def test_manifest_is_not_a_skill(native):
     library.adopt("email-polisher")
     assert {s["slug"] for s in discovery.scan()["skills"] if s["status"] == "adopted"} == {"email-polisher"}
+
+
+def test_plan_adopt_moves_nothing(native):
+    before = _row("email-polisher")
+    plan = library.plan_adopt("email-polisher")
+    assert plan["from"] == str(native / "email-polisher")
+    assert plan["to"] == str(paths.library_dir() / "email-polisher")
+    assert plan["moved_copies"] == [] and plan["warnings"] == [] and len(plan["fingerprint"]) == 16
+    assert (native / "email-polisher").is_dir() and not (paths.library_dir() / "email-polisher").exists()
+    assert _row("email-polisher") == before
+    assert not (paths.library_dir() / "RESTORE.json").exists()
+
+
+def test_adopt_returns_exactly_its_plan(tmp_home):
+    _copies(tmp_home, ".claude", ".agents")
+    plan = library.plan_adopt("email-polisher")
+    result = library.adopt("email-polisher")
+    assert result == plan
+    assert not os.path.exists(plan["from"]) and os.path.isdir(plan["to"])
+    assert len(plan["moved_copies"]) == 1 and not os.path.exists(plan["moved_copies"][0])
+
+
+def test_plan_adopt_raises_like_adopt(native):
+    library.adopt("email-polisher")
+    with pytest.raises(ValueError, match="already adopted"):
+        library.plan_adopt("email-polisher")
+    with pytest.raises(ValueError, match="not found"):
+        library.plan_adopt("nope")
+
+
+def test_plan_release_moves_nothing(native):
+    library.adopt("email-polisher")
+    plan = library.plan_release("email-polisher")
+    assert plan["to"] == str(native / "email-polisher")
+    assert plan["from"] == str(paths.library_dir() / "email-polisher")
+    assert plan["moves"][0] == [plan["to"], plan["from"]]
+    assert not (native / "email-polisher").exists() and _row("email-polisher")["status"] == "adopted"
+
+
+def test_release_returns_exactly_its_plan(tmp_home):
+    _copies(tmp_home, ".claude", ".agents")
+    library.adopt("email-polisher")
+    plan = library.plan_release("email-polisher")
+    assert library.release("email-polisher") == plan
+    assert all(os.path.isdir(origin) for origin, _stored in plan["moves"])
+
+
+def test_plan_release_refuses_native(native):
+    with pytest.raises(ValueError, match="not adopted"):
+        library.plan_release("email-polisher")
+
+
+def test_release_all_dry_run_moves_nothing(native):
+    library.adopt("email-polisher")
+    library.adopt("csv-cleaner")
+    result = library.release_all(dry_run=True)
+    assert [r["slug"] for r in result["released"]] == ["csv-cleaner", "email-polisher"] and result["failed"] == []
+    assert not (native / "email-polisher").exists() and not (native / "csv-cleaner").exists()

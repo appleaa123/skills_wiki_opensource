@@ -79,10 +79,9 @@ def _remove_empty_holding_dir(slug: str) -> None:
             return
 
 
-def adopt(slug: str) -> dict:
-    """Move the skill into the library. Other copies of the same skill in other agents' folders are moved too
-    when they are byte-identical (so no agent keeps triggering it natively); a differing copy is left in place and
-    reported. All-or-nothing: any failure puts every folder back."""
+def plan_adopt(slug: str) -> dict:
+    """Everything adopt() checks and decides, without touching a file or a row. Raises exactly what adopt()
+    raises, so a dry run fails the same way the real move would."""
     row = _row(slug)
     if row["status"] == "plugin":
         raise ValueError(f"'{slug}' is plugin-managed; disable it in your agent's plugin settings instead")
@@ -97,7 +96,7 @@ def adopt(slug: str) -> dict:
     if _is_link(source) and not os.path.isabs(os.readlink(source)):
         raise ValueError(f"{source} is a relative symlink; moving it would break it. Make the link absolute, or "
                          f"adopt the folder it points to ({source.resolve()})")
-    digest = fingerprint(source)  # before any move: an unreadable file stops us with nothing moved
+    digest = fingerprint(source)  # an unreadable file stops us here, with nothing moved
     identical, differing, linked = [], [], []
     others = _other_native_copies(slug, source)
     # A real folder that a symlinked copy (or the skill itself) points at stays put: moving it would leave the link
@@ -113,34 +112,43 @@ def adopt(slug: str) -> dict:
             differing.append(other)
     if identical and _exists(_copies_dir(slug)):
         raise ValueError(f"{_copies_dir(slug)} already exists; move or remove it first")
+    return {"slug": slug, "from": str(source), "to": str(target), "fingerprint": digest,
+            "moved_copies": [str(o) for o in identical], "other_copies": [str(o) for o in differing + linked],
+            "differing_copies": [str(o) for o in differing], "linked_copies": [str(o) for o in linked],
+            "warnings": []}
 
+
+def adopt(slug: str) -> dict:
+    """Move the skill into the library, following plan_adopt(). Identical copies in other agents' folders move
+    too (so no agent keeps triggering it natively); a differing copy is left in place and reported.
+    All-or-nothing: any failure puts every folder back."""
+    plan = plan_adopt(slug)
+    source, target = Path(plan["from"]), Path(plan["to"])
     moves: list[tuple[Path, Path]] = []
     try:
         shutil.move(str(source), str(target))
         moves.append((source, target))
-        for i, other in enumerate(identical, start=1):
+        for i, other in enumerate(plan["moved_copies"], start=1):
             stored = _copies_dir(slug) / str(i)
             stored.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(other), str(stored))
-            moves.append((other, stored))
+            shutil.move(other, str(stored))
+            moves.append((Path(other), stored))
         copies = [{"origin": str(o), "stored": str(s)} for o, s in moves[1:]]
         with store.connect() as conn:
             conn.execute("UPDATE skills SET status = 'adopted', path = ?, origin_path = ?, fingerprint = ?, "
                          "adopted_at = ?, updated_at = ?, copies = ? WHERE slug = ?",
-                         (str(target), str(source), digest, store.now(), store.now(),
+                         (str(target), str(source), plan["fingerprint"], store.now(), store.now(),
                           json.dumps(copies) if copies else None, slug))
     except Exception:
         _move_back(moves)  # keep adopt all-or-nothing
         _remove_empty_holding_dir(slug)
         raise
     _refresh_manifest()
-    return {"slug": slug, "from": str(source), "to": str(target), "moved_copies": [str(o) for o in identical],
-            "other_copies": [str(o) for o in differing + linked], "differing_copies": [str(o) for o in differing],
-            "linked_copies": [str(o) for o in linked]}
+    return plan
 
 
-def release(slug: str) -> dict:
-    """Move the skill, and every copy adopted with it, back where they came from."""
+def plan_release(slug: str) -> dict:
+    """Everything release() checks and decides, without touching a file or a row."""
     row = _row(slug)
     if row["status"] != "adopted" or not row["origin_path"]:
         raise ValueError(f"'{slug}' is not adopted")
@@ -154,6 +162,15 @@ def release(slug: str) -> dict:
     for origin, _stored in moves:  # check every destination before moving anything
         if _exists(origin):
             raise ValueError(f"{origin} already exists; move or remove it first")
+    return {"slug": slug, "from": str(moves[0][1]), "to": str(moves[0][0]),
+            "restored_copies": [str(o) for o, _s in moves[1:]], "missing_copies": missing,
+            "moves": [[str(o), str(s)] for o, s in moves]}
+
+
+def release(slug: str) -> dict:
+    """Move the skill, and every copy adopted with it, back where they came from (see plan_release)."""
+    plan = plan_release(slug)
+    moves = [(Path(o), Path(s)) for o, s in plan["moves"]]
     done: list[tuple[Path, Path]] = []
     try:
         for origin, stored in moves:
@@ -163,16 +180,15 @@ def release(slug: str) -> dict:
         with store.connect() as conn:
             conn.execute("UPDATE skills SET status = 'native', path = ?, origin_path = NULL, fingerprint = NULL, "
                          "adopted_at = NULL, copies = NULL, updated_at = ? WHERE slug = ?",
-                         (str(moves[0][0]), store.now(), slug))
+                         (plan["to"], store.now(), slug))
     except Exception:
         for origin, stored in reversed(done):
             shutil.move(str(origin), str(stored))
         raise
-    if copies:
+    if plan["restored_copies"] or plan["missing_copies"]:
         _remove_empty_holding_dir(slug)
     _refresh_manifest()
-    return {"slug": slug, "from": str(moves[0][1]), "to": str(moves[0][0]),
-            "restored_copies": [str(o) for o, _s in moves[1:]], "missing_copies": missing}
+    return plan
 
 
 def write_manifest() -> Path:
@@ -196,14 +212,15 @@ def _refresh_manifest() -> None:
         pass  # the store stays the source of truth; a failed manifest write must not undo a finished move
 
 
-def release_all() -> dict:
-    """Release every adopted skill. Keeps going past a failure and reports it."""
+def release_all(dry_run: bool = False) -> dict:
+    """Release every adopted skill (or, with dry_run, only plan it). Keeps going past a failure and reports it."""
     with store.connect() as conn:
         slugs = [r["slug"] for r in conn.execute("SELECT slug FROM skills WHERE status = 'adopted' ORDER BY slug")]
+    act = plan_release if dry_run else release
     released, failed = [], []
     for slug in slugs:
         try:
-            released.append(release(slug))
+            released.append(act(slug))
         except (ValueError, OSError) as exc:
             failed.append({"slug": slug, "error": str(exc)})
     return {"released": released, "failed": failed}
