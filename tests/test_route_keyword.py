@@ -71,3 +71,21 @@ def test_request_excerpt_truncated(adopted):
     with store.connect() as conn:
         excerpt = conn.execute("SELECT request_excerpt FROM routing_log").fetchone()[0]
     assert len(excerpt) == keyword.EXCERPT_MAX_CHARS
+
+
+def test_tokenize_splits_chinese_into_overlapping_pairs():
+    """Phase 12: Chinese has no spaces, so whole sentences became one unmatched token."""
+    assert keyword.tokenize("自学编程") == ["自学", "学编", "编程"]
+    assert keyword.tokenize("学") == ["学"]
+    assert keyword.tokenize("learn 编程 now") == ["learn", "编程", "now"]
+
+
+def test_chinese_request_finds_a_chinese_skill(tmp_home):
+    from skillswiki import discovery, library
+    root = tmp_home / "native" / "video-ideas"
+    root.mkdir(parents=True)
+    (root / "SKILL.md").write_text("---\nname: video-ideas\ndescription: 跟用户讨论短视频选题，提炼切入角度，写一份草稿。\n"
+                                   "---\nbody\n", encoding="utf-8")
+    discovery.sync_db()
+    library.adopt("video-ideas")
+    assert keyword.shortlist("帮我想想这条短视频从哪个角度切入")[0][0] == "video-ideas"

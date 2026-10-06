@@ -93,3 +93,13 @@ def test_unknown_agent_prints_nothing(adopted, monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"prompt": PROMPT})))
     hook.main(["--agent", "nope"])
     assert capsys.readouterr().out == ""
+
+
+def test_shortlist_hint_asks_the_agent_to_check_before_answering(adopted):
+    """Phase 12: Claude Code ignored 'if one clearly fits ... otherwise proceed'; the hint now asks it to open the
+    top match and judge, without ordering it to use a skill that may be a keyword false positive."""
+    line = hook.context_line({"shortlist": [{"skill": "email-polisher", "score": 3.0},
+                                            {"skill": "csv-cleaner", "score": 1.0}]})
+    assert "Before you answer" in line and "load_skill" in line and "email-polisher" in line
+    assert "otherwise proceed without a skill" not in line
+    assert "csv-cleaner" in line and "if it does not fit" in line

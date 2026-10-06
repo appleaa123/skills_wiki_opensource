@@ -19,10 +19,14 @@ def context_line(result: dict) -> str:
         return (f"Skills Wiki: skill \"{result['skill']}\" fits this request (confidence "
                 f"{result.get('confidence', 0):.2f}). Load it with load_skill or `skillswiki load {result['skill']}`.")
     names = [i["skill"] for i in result.get("shortlist", [])[:SHORTLIST_SHOWN]]
-    if names:
-        return (f"Skills Wiki: possibly relevant skills: {', '.join(names)}. If one clearly fits, load it with "
-                "load_skill or `skillswiki load <slug>`; otherwise proceed without a skill.")
-    return ""
+    if not names:
+        return ""
+    # Firm about checking, not about using: a keyword top match can be a false positive (Phase 12 test run).
+    top, rest = names[0], names[1:]
+    line = (f"Skills Wiki: this user installed a skill that may cover this request: \"{top}\". Before you answer, "
+            f"load it with load_skill (or run `skillswiki load {top}`) and follow it if it fits; answer normally if it "
+            "does not fit.")
+    return line + (f" Other candidates: {', '.join(rest)}." if rest else "")
 
 
 def _prompt(fmt: str, payload: dict) -> str:
