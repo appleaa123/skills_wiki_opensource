@@ -58,3 +58,18 @@ def test_old_database_gains_copies_column(tmp_home):
     old.close()
     with store.connect() as conn:
         assert "copies" in {r["name"] for r in conn.execute("PRAGMA table_info(skills)")}
+
+
+def test_wiring_tables_exist_and_check_values(tmp_home):
+    import sqlite3
+
+    import pytest
+    from skillswiki import store
+    with store.connect() as conn:
+        conn.execute("INSERT INTO wiring (agent, method, self_setup, mcp, test, updated_at) "
+                     "VALUES ('codex', 'hook', 0, 'done', 'untested', 'now')")
+        conn.execute("INSERT INTO wiring_files (path, created, original, written_sha, parts) "
+                     "VALUES ('/x', 1, NULL, 'abc', '[]')")
+    with pytest.raises(sqlite3.IntegrityError), store.connect() as conn:
+        conn.execute("INSERT INTO wiring (agent, method, self_setup, mcp, test, updated_at) "
+                     "VALUES ('cursor', 'magic', 0, 'none', 'untested', 'now')")

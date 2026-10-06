@@ -40,6 +40,18 @@ CREATE TABLE IF NOT EXISTS evals (
   verdict TEXT, delta_pp REAL, rubric_score REAL, tokens_total INTEGER, accepted INTEGER NOT NULL DEFAULT 0,
   results TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS wiring (
+  agent TEXT PRIMARY KEY,
+  method TEXT NOT NULL CHECK (method IN ('hook','rules','advice')),
+  self_setup INTEGER NOT NULL DEFAULT 0,          -- 1: the agent edits its own config (D31)
+  mcp TEXT NOT NULL DEFAULT 'none' CHECK (mcp IN ('none','done','present','self_setup')),
+  test TEXT NOT NULL CHECK (test IN ('tested_ok','untested','failed')),
+  updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS wiring_files (
+  path TEXT PRIMARY KEY, created INTEGER NOT NULL,  -- 1: the file did not exist before setup
+  original TEXT,                                    -- copy of the pre-setup bytes (NULL when created)
+  written_sha TEXT NOT NULL,                        -- sha256 of what we last wrote
+  parts TEXT NOT NULL DEFAULT '[]');                -- JSON [{"user": "<agent>:<slot>", "part": "<id>"}]
 """
 
 
