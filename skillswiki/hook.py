@@ -4,6 +4,7 @@ plan/research_agent_wiring.md. Never prints the skill body and never blocks the 
 exits 0. Without --agent it behaves exactly as before (Claude Code, https://code.claude.com/docs/en/hooks).
 """
 import json
+import os
 import sys
 
 MIN_PROMPT_CHARS = 15
@@ -12,6 +13,7 @@ BUDGET_S = 5.0  # well inside every agent's hook timeout; past it, keyword routi
 SHORTLIST_SHOWN = 3
 EVENT = "UserPromptSubmit"
 DEFAULT_AGENT = "claude_code"
+OFF_ENV = "SKILLSWIKI_HOOK_OFF"  # "1": an app running the agent for its own work (TaskFollow) wants no advice added
 
 
 def context_line(result: dict) -> str:
@@ -71,9 +73,12 @@ def agent_from(argv: list[str]) -> str:
 
 def main(argv: list[str] | None = None) -> None:
     try:
+        payload = sys.stdin.read()  # read it all either way, so the agent never writes into a closed pipe
+        if os.environ.get(OFF_ENV) == "1":
+            return
         from skillswiki import paths
         paths.load_env()
-        out = respond(json.loads(sys.stdin.read() or "{}"), agent_from(argv or []))
+        out = respond(json.loads(payload or "{}"), agent_from(argv or []))
     except Exception:
         out = ""
     if out:

@@ -28,6 +28,12 @@ def test_shortlist_becomes_additional_context(adopted, monkeypatch, capsys):
     assert "Email polisher" not in data["additionalContext"]  # never the skill body
 
 
+def test_hook_off_env_prints_nothing(adopted, monkeypatch, capsys):
+    """An app that runs the agent for its own work (TaskFollow's judges) sets SKILLSWIKI_HOOK_OFF=1."""
+    monkeypatch.setenv(hook.OFF_ENV, "1")
+    assert _run(monkeypatch, capsys, json.dumps({"prompt": "please fix my email draft before I send it"})) == ""
+
+
 @pytest.mark.parametrize("prompt", ["short one", "/compact everything in the session now", "zzzz qqqq xxxx yyyy"])
 def test_silent_cases(adopted, monkeypatch, capsys, prompt):
     assert _run(monkeypatch, capsys, json.dumps({"prompt": prompt})) == ""
